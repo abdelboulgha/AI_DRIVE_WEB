@@ -3,6 +3,7 @@ package com.example.backend.service;
 import com.example.backend.entity.AccelerometerData;
 import com.example.backend.entity.GPSData;
 import com.example.backend.entity.GyroscopeData;
+import com.example.backend.entity.User;
 import com.example.backend.repository.AccelerometerRepository;
 import com.example.backend.repository.GPSRepository;
 import com.example.backend.repository.GyroscopeRepository;
@@ -29,10 +30,10 @@ public class SensorDataService {
     }
 
     // Méthodes pour l'accéléromètre
-    public AccelerometerData saveAccelerometerData(AccelerometerData data) {
-        if (data.getTimestamp() == null) {
-            data.setTimestamp(LocalDateTime.now());
-        }
+    public AccelerometerData saveAccelerometerData(AccelerometerData data, User user) {
+        // Toujours définir le timestamp côté serveur, quelles que soient les données reçues
+        data.setTimestamp(LocalDateTime.now());
+        data.setUser(user);
         return accelerometerRepository.save(data);
     }
 
@@ -40,15 +41,24 @@ public class SensorDataService {
         return accelerometerRepository.findAll();
     }
 
+    public List<AccelerometerData> getAccelerometerDataByUser(User user) {
+        return accelerometerRepository.findByUser(user);
+    }
+
     public List<AccelerometerData> getAccelerometerDataByDeviceId(String deviceId) {
         return accelerometerRepository.findByDeviceId(deviceId);
     }
 
+    public List<AccelerometerData> getAccelerometerDataByUserAndDeviceId(User user, String deviceId) {
+        return accelerometerRepository.findByUserAndDeviceId(user, deviceId);
+    }
+
     // Méthodes pour le GPS
-    public GPSData saveGPSData(GPSData data) {
+    public GPSData saveGPSData(GPSData data, User user) {
         if (data.getTimestamp() == null) {
             data.setTimestamp(LocalDateTime.now());
         }
+        data.setUser(user);
         return gpsRepository.save(data);
     }
 
@@ -56,15 +66,24 @@ public class SensorDataService {
         return gpsRepository.findAll();
     }
 
+    public List<GPSData> getGPSDataByUser(User user) {
+        return gpsRepository.findByUser(user);
+    }
+
     public List<GPSData> getGPSDataByDeviceId(String deviceId) {
         return gpsRepository.findByDeviceId(deviceId);
     }
 
+    public List<GPSData> getGPSDataByUserAndDeviceId(User user, String deviceId) {
+        return gpsRepository.findByUserAndDeviceId(user, deviceId);
+    }
+
     // Méthodes pour le gyroscope
-    public GyroscopeData saveGyroscopeData(GyroscopeData data) {
+    public GyroscopeData saveGyroscopeData(GyroscopeData data, User user) {
         if (data.getTimestamp() == null) {
             data.setTimestamp(LocalDateTime.now());
         }
+        data.setUser(user);
         return gyroscopeRepository.save(data);
     }
 
@@ -72,7 +91,15 @@ public class SensorDataService {
         return gyroscopeRepository.findAll();
     }
 
+    public List<GyroscopeData> getGyroscopeDataByUser(User user) {
+        return gyroscopeRepository.findByUser(user);
+    }
+
     public List<GyroscopeData> getGyroscopeDataByDeviceId(String deviceId) {
         return gyroscopeRepository.findByDeviceId(deviceId);
+    }
+
+    public List<GyroscopeData> getGyroscopeDataByUserAndDeviceId(User user, String deviceId) {
+        return gyroscopeRepository.findByUserAndDeviceId(user, deviceId);
     }
 }

@@ -1,5 +1,6 @@
 package com.example.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -17,16 +18,22 @@ public class GyroscopeData {
     private String deviceId;
     private LocalDateTime timestamp;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnore
+    private User user;
+
     // Constructeurs
     public GyroscopeData() {
     }
 
-    public GyroscopeData(float rotationX, float rotationY, float rotationZ, String deviceId, LocalDateTime timestamp) {
+    public GyroscopeData(float rotationX, float rotationY, float rotationZ, String deviceId, LocalDateTime timestamp, User user) {
         this.rotationX = rotationX;
         this.rotationY = rotationY;
         this.rotationZ = rotationZ;
         this.deviceId = deviceId;
         this.timestamp = timestamp;
+        this.user = user;
     }
 
     // Getters et Setters
@@ -76,5 +83,14 @@ public class GyroscopeData {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    // Nouveaux getters et setters pour user
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 }

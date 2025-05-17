@@ -18,17 +18,22 @@ public class GPSData {
     private String deviceId;
     private LocalDateTime timestamp;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     // Constructeurs
     public GPSData() {
     }
 
-    public GPSData(double latitude, double longitude, double altitude, float speed, String deviceId, LocalDateTime timestamp) {
+    public GPSData(double latitude, double longitude, double altitude, float speed, String deviceId, LocalDateTime timestamp, User user) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.altitude = altitude;
         this.speed = speed;
         this.deviceId = deviceId;
         this.timestamp = timestamp;
+        this.user = user;
     }
 
     // Getters et Setters
@@ -86,5 +91,14 @@ public class GPSData {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    // Nouveaux getters et setters pour user
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 }

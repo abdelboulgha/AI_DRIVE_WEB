@@ -6,6 +6,7 @@ import com.example.backend.dto.StatsSummaryDTO;
 import com.example.backend.entity.AccelerometerData;
 import com.example.backend.entity.GPSData;
 import com.example.backend.entity.GyroscopeData;
+import com.example.backend.entity.User;
 import com.example.backend.repository.AccelerometerRepository;
 import com.example.backend.repository.GPSRepository;
 import com.example.backend.repository.GyroscopeRepository;
@@ -52,11 +53,37 @@ public class StatsService {
         return summary;
     }
 
+    public StatsSummaryDTO getStatsSummaryByUser(User user) {
+        StatsSummaryDTO summary = new StatsSummaryDTO();
+
+        // Compter les appareils uniques pour cet utilisateur
+        Set<String> uniqueDevices = new HashSet<>();
+        uniqueDevices.addAll(accelerometerRepository.findDistinctDeviceIdsByUser(user));
+        uniqueDevices.addAll(gpsRepository.findDistinctDeviceIdsByUser(user));
+        uniqueDevices.addAll(gyroscopeRepository.findDistinctDeviceIdsByUser(user));
+
+        summary.setActiveDevices(uniqueDevices.size());
+        summary.setTotalGPSPoints(gpsRepository.findByUser(user).size());
+        summary.setTotalAccelerometerReadings(accelerometerRepository.findByUser(user).size());
+        summary.setTotalGyroscopeReadings(gyroscopeRepository.findByUser(user).size());
+
+        return summary;
+    }
+
     public List<String> getAllDeviceIds() {
         Set<String> uniqueDevices = new HashSet<>();
         uniqueDevices.addAll(accelerometerRepository.findDistinctDeviceIds());
         uniqueDevices.addAll(gpsRepository.findDistinctDeviceIds());
         uniqueDevices.addAll(gyroscopeRepository.findDistinctDeviceIds());
+
+        return new ArrayList<>(uniqueDevices);
+    }
+
+    public List<String> getDeviceIdsByUser(User user) {
+        Set<String> uniqueDevices = new HashSet<>();
+        uniqueDevices.addAll(accelerometerRepository.findDistinctDeviceIdsByUser(user));
+        uniqueDevices.addAll(gpsRepository.findDistinctDeviceIdsByUser(user));
+        uniqueDevices.addAll(gyroscopeRepository.findDistinctDeviceIdsByUser(user));
 
         return new ArrayList<>(uniqueDevices);
     }
@@ -83,6 +110,34 @@ public class StatsService {
         dashboardData.setRecentGyroscopeData(recentGyroscopeData);
 
         // Générer des activités d'appareils
+        List<DeviceActivityDTO> activities = generateDeviceActivities(recentGPSData, recentAccelerometerData, recentGyroscopeData);
+        dashboardData.setDeviceActivities(activities);
+
+        return dashboardData;
+    }
+
+    public DashboardDataDTO getDashboardDataByUser(User user) {
+        DashboardDataDTO dashboardData = new DashboardDataDTO();
+
+        // Récupérer les statistiques pour l'utilisateur
+        StatsSummaryDTO summary = getStatsSummaryByUser(user);
+        dashboardData.setActiveDevices(summary.getActiveDevices());
+        dashboardData.setTotalGPSPoints(summary.getTotalGPSPoints());
+        dashboardData.setTotalAccelerometerReadings(summary.getTotalAccelerometerReadings());
+        dashboardData.setTotalGyroscopeReadings(summary.getTotalGyroscopeReadings());
+
+        // Obtenir les données récentes (dernières 24h) pour l'utilisateur
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
+
+        List<GPSData> recentGPSData = gpsRepository.findByUserAndTimestampAfter(user, yesterday);
+        List<AccelerometerData> recentAccelerometerData = accelerometerRepository.findByUserAndTimestampAfter(user, yesterday);
+        List<GyroscopeData> recentGyroscopeData = gyroscopeRepository.findByUserAndTimestampAfter(user, yesterday);
+
+        dashboardData.setRecentGPSData(recentGPSData);
+        dashboardData.setRecentAccelerometerData(recentAccelerometerData);
+        dashboardData.setRecentGyroscopeData(recentGyroscopeData);
+
+        // Générer des activités d'appareils pour cet utilisateur
         List<DeviceActivityDTO> activities = generateDeviceActivities(recentGPSData, recentAccelerometerData, recentGyroscopeData);
         dashboardData.setDeviceActivities(activities);
 

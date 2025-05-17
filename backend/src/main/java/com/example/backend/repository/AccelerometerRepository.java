@@ -1,6 +1,7 @@
 package com.example.backend.repository;
 
 import com.example.backend.entity.AccelerometerData;
+import com.example.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -12,7 +13,13 @@ import java.util.List;
 public interface AccelerometerRepository extends JpaRepository<AccelerometerData, Long> {
     List<AccelerometerData> findByDeviceId(String deviceId);
     List<AccelerometerData> findByTimestampAfter(LocalDateTime timestamp);
+    List<AccelerometerData> findByUser(User user);
+    List<AccelerometerData> findByUserAndDeviceId(User user, String deviceId);
+    List<AccelerometerData> findByUserAndTimestampAfter(User user, LocalDateTime timestamp);
 
     @Query("SELECT DISTINCT a.deviceId FROM AccelerometerData a")
     List<String> findDistinctDeviceIds();
+
+    @Query("SELECT DISTINCT a.deviceId FROM AccelerometerData a WHERE a.user = ?1")
+    List<String> findDistinctDeviceIdsByUser(User user);
 }
