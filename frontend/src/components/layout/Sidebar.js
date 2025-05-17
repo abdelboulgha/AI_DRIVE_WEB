@@ -334,32 +334,7 @@ const Sidebar = ({ open, onClose }) => {
           </ListItemIcon>
           <ListItemText primary="Mon profil" />
         </ListItem>
-        <ListItem 
-          button 
-          component={Link} 
-          to="/settings"
-          onClick={handleItemClick}
-          selected={location.pathname === '/settings'}
-          sx={{ borderRadius: 1 }}
-        >
-          <ListItemIcon>
-            <SettingsIcon />
-          </ListItemIcon>
-          <ListItemText primary="Paramètres" />
-        </ListItem>
-        <ListItem 
-          button 
-          component={Link} 
-          to="/help"
-          onClick={handleItemClick}
-          selected={location.pathname === '/help'}
-          sx={{ borderRadius: 1 }}
-        >
-          <ListItemIcon>
-            <HelpIcon />
-          </ListItemIcon>
-          <ListItemText primary="Aide" />
-        </ListItem>
+
         <ListItem button onClick={handleLogout} sx={{ borderRadius: 1 }}>
           <ListItemIcon>
             <ExitToAppIcon />

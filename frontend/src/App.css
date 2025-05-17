@@ -54,3 +54,15 @@
   min-height: calc(100vh - 64px);
   background-color: #f5f5f5;
 }
+
+.css-1o1715v-MuiPaper-root {
+  background-color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
+  transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+  background-image: var(--Paper-overlay);
+  padding: 32px;
+  border-radius: 16px; /* Updated to 16px as specified */
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12); /* Custom shadow as specified */
+}
