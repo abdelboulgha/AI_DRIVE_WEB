@@ -1,11 +1,19 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import authService from '../../api/authService';
 
 const PrivateRoute = ({ children }) => {
-  // Pour la démo, on suppose que l'utilisateur est toujours authentifié
-  const isAuthenticated = true; // ou localStorage.getItem('authToken');
+  const location = useLocation();
+  const isAuthenticated = authService.isAuthenticated();
   
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  // Si l'utilisateur n'est pas connecté, rediriger vers la page de connexion
+  // en conservant l'URL originale dans l'état pour une redirection après connexion
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location.pathname }} />;
+  }
+  
+  // Si l'utilisateur est connecté, afficher le contenu protégé
+  return children;
 };
 
 export default PrivateRoute;
