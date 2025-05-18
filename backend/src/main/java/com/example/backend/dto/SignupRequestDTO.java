@@ -4,6 +4,7 @@ public class SignupRequestDTO {
     private String username;
     private String password;
     private String email;
+    private String telephone;
     private Long vehicleId;  // ID du véhicule sélectionné lors de l'inscription
 
     public String getUsername() {
@@ -28,6 +29,14 @@ public class SignupRequestDTO {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getTelephone() {
+        return telephone;
+    }
+
+    public void setTelephone(String telephone) {
+        this.telephone = telephone;
     }
 
     public Long getVehicleId() {

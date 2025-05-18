@@ -3,11 +3,15 @@ package com.example.backend.controller;
 import com.example.backend.dto.AuthResponseDTO;
 import com.example.backend.dto.LoginRequestDTO;
 import com.example.backend.dto.SignupRequestDTO;
+import com.example.backend.entity.User;
+import com.example.backend.repository.UserRepository;
 import com.example.backend.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -15,10 +19,12 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserRepository userRepository;
 
     @Autowired
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/signup")
@@ -38,6 +44,16 @@ public class AuthController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             throw new RuntimeException("Error during login: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        try {
+            List<User> users = userRepository.findAll();
+            return new ResponseEntity<>(users, HttpStatus.OK);
+        } catch (Exception e) {
+            throw new RuntimeException("Error retrieving users: " + e.getMessage());
         }
     }
 }

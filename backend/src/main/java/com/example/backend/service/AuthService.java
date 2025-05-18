@@ -43,11 +43,12 @@ public class AuthService {
         }
 
         // Créer un nouvel utilisateur
-        User user = new User(
-                signupRequest.getUsername(),
-                passwordEncoder.encode(signupRequest.getPassword()),
-                signupRequest.getEmail()
-        );
+        User user = new User();
+        user.setUsername(signupRequest.getUsername());
+        user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
+        user.setEmail(signupRequest.getEmail());
+        user.setTelephone(signupRequest.getTelephone());
+        user.setStatus("ACTIF");
 
         // Assigner le véhicule si un ID est fourni
         if (signupRequest.getVehicleId() != null) {
@@ -78,6 +79,11 @@ public class AuthService {
 
         User user = userOpt.get();
 
+        // Vérifier si l'utilisateur est actif
+        if (!"ACTIF".equals(user.getStatus())) {
+            throw new RuntimeException("Compte utilisateur inactif");
+        }
+
         // Vérifier le mot de passe
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid username or password");
@@ -102,8 +108,15 @@ public class AuthService {
             throw new RuntimeException("Invalid or expired token");
         }
 
-        return userRepository.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Vérifier si l'utilisateur est actif
+        if (!"ACTIF".equals(user.getStatus())) {
+            throw new RuntimeException("Compte utilisateur inactif");
+        }
+
+        return user;
     }
 
     private String generateToken() {

@@ -21,6 +21,12 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Column(nullable = true)  // Rendre le champ nullable
+    private String telephone;
+
+    @Column(nullable = false)
+    private String status = "ACTIF"; // Valeur par défaut
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AccelerometerData> accelerometerData = new ArrayList<>();
 
@@ -42,10 +48,12 @@ public class User {
     public User() {
     }
 
-    public User(String username, String password, String email) {
+    public User(String username, String password, String email, String telephone) {
         this.username = username;
         this.password = password;
         this.email = email;
+        this.telephone = telephone;
+        this.status = "ACTIF";
     }
 
     // Getters et Setters
@@ -79,6 +87,22 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getTelephone() {
+        return telephone;
+    }
+
+    public void setTelephone(String telephone) {
+        this.telephone = telephone;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public List<AccelerometerData> getAccelerometerData() {
