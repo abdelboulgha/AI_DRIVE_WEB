@@ -328,9 +328,7 @@ const UserForm = ({ open, handleClose, user, onSave }) => {
                 onChange={handleChange}
                 label="Rôle"
               >
-                <MenuItem value="USER">Utilisateur standard</MenuItem>
-                <MenuItem value="MANAGER">Gestionnaire</MenuItem>
-                <MenuItem value="ADMIN">Administrateur</MenuItem>
+                <MenuItem value="USER">Client</MenuItem>
               </Select>
               {errors.role && <FormHelperText>{errors.role}</FormHelperText>}
             </FormControl>

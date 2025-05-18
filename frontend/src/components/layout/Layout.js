@@ -28,8 +28,8 @@ const Layout = () => {
           flexGrow: 1,
           p: 3,
           width: { sm: `calc(100% - 240px)` },
-          ml: { sm: '240px' },
-          mt: '64px',
+          //ml: { sm: '240px' },
+          mt: '34px',
           minHeight: 'calc(100vh - 64px)',
           bgcolor: 'background.default'
         }}

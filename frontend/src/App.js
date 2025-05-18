@@ -7,9 +7,7 @@ import Dashboard from './pages/Dashboard';
 import AccelerometerData from './pages/AccelerometerData';
 import GPSData from './pages/GPSData';
 import GyroscopeData from './pages/GyroscopeData';
-import DevicesList from './pages/DevicesList';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import UsersList from './pages/UsersList';
@@ -22,7 +20,6 @@ import AlertDetails from './pages/AlertDetails';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
-import NotFound from './pages/NotFound';
 
 // Création du thème
 const theme = createTheme({
@@ -119,7 +116,6 @@ function App() {
         <Routes>
           {/* Routes publiques */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
@@ -131,7 +127,6 @@ function App() {
             <Route path="accelerometer" element={<PrivateRoute><AccelerometerData /></PrivateRoute>} />
             <Route path="gps" element={<PrivateRoute><GPSData /></PrivateRoute>} />
             <Route path="gyroscope" element={<PrivateRoute><GyroscopeData /></PrivateRoute>} />
-            <Route path="devices" element={<PrivateRoute><DevicesList /></PrivateRoute>} />
             
             {/* Routes de gestion des utilisateurs */}
             <Route path="users" element={<AdminRoute><UsersList /></AdminRoute>} />
@@ -147,9 +142,6 @@ function App() {
             {/* Routes de gestion des alertes */}
             <Route path="alerts" element={<PrivateRoute><AlertsList /></PrivateRoute>} />
             <Route path="alerts/:alertId" element={<PrivateRoute><AlertDetails /></PrivateRoute>} />
-            
-            {/* Page 404 */}
-            <Route path="*" element={<NotFound />} />
           </Route>
           
           {/* Redirection par défaut */}
