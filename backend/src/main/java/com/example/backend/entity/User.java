@@ -30,6 +30,14 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<GyroscopeData> gyroscopeData = new ArrayList<>();
 
+    @ManyToMany
+    @JoinTable(
+            name = "user_vehicles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "vehicle_id")
+    )
+    private List<Vehicle> vehicles = new ArrayList<>();
+
     // Constructeurs
     public User() {
     }
@@ -95,5 +103,24 @@ public class User {
 
     public void setGyroscopeData(List<GyroscopeData> gyroscopeData) {
         this.gyroscopeData = gyroscopeData;
+    }
+
+    public List<Vehicle> getVehicles() {
+        return vehicles;
+    }
+
+    public void setVehicles(List<Vehicle> vehicles) {
+        this.vehicles = vehicles;
+    }
+
+    // Méthodes utilitaires pour la gestion des relations
+    public void addVehicle(Vehicle vehicle) {
+        this.vehicles.add(vehicle);
+        vehicle.getUsers().add(this);
+    }
+
+    public void removeVehicle(Vehicle vehicle) {
+        this.vehicles.remove(vehicle);
+        vehicle.getUsers().remove(this);
     }
 }

@@ -1,10 +1,10 @@
-
 package com.example.backend.service;
 
 import com.example.backend.dto.AuthResponseDTO;
 import com.example.backend.dto.LoginRequestDTO;
 import com.example.backend.dto.SignupRequestDTO;
 import com.example.backend.entity.User;
+import com.example.backend.entity.Vehicle;
 import com.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,14 +20,16 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final VehicleService vehicleService;
 
     // Stockage simplifié des tokens (à remplacer par JWT en production)
     private final Map<String, Long> tokens = new HashMap<>();
 
     @Autowired
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, VehicleService vehicleService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.vehicleService = vehicleService;
     }
 
     public AuthResponseDTO signup(SignupRequestDTO signupRequest) {
@@ -46,6 +48,14 @@ public class AuthService {
                 passwordEncoder.encode(signupRequest.getPassword()),
                 signupRequest.getEmail()
         );
+
+        // Assigner le véhicule si un ID est fourni
+        if (signupRequest.getVehicleId() != null) {
+            Vehicle vehicle = vehicleService.getVehicleById(signupRequest.getVehicleId());
+            user.addVehicle(vehicle);
+        } else {
+            throw new RuntimeException("Un véhicule doit être spécifié lors de l'inscription");
+        }
 
         // Sauvegarder l'utilisateur
         user = userRepository.save(user);
@@ -96,10 +106,7 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-
     private String generateToken() {
         return UUID.randomUUID().toString();
     }
-
-
 }
