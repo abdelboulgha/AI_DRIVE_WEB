@@ -1,5 +1,6 @@
 package com.example.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -20,13 +21,19 @@ public class GPSData {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @JsonIgnore
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    @JsonIgnore
+    private Vehicle vehicle;
 
     // Constructeurs
     public GPSData() {
     }
 
-    public GPSData(double latitude, double longitude, double altitude, float speed, String deviceId, LocalDateTime timestamp, User user) {
+    public GPSData(double latitude, double longitude, double altitude, float speed, String deviceId, LocalDateTime timestamp, User user, Vehicle vehicle) {
         this.latitude = latitude;
         this.longitude = longitude;
         this.altitude = altitude;
@@ -34,6 +41,7 @@ public class GPSData {
         this.deviceId = deviceId;
         this.timestamp = timestamp;
         this.user = user;
+        this.vehicle = vehicle;
     }
 
     // Getters et Setters
@@ -93,12 +101,20 @@ public class GPSData {
         this.timestamp = timestamp;
     }
 
-    // Nouveaux getters et setters pour user
     public User getUser() {
         return user;
     }
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Vehicle getVehicle() {
+        return vehicle;
+    }
+
+    // Méthode ajoutée pour résoudre l'erreur
+    public void setVehicle(Vehicle vehicle) {
+        this.vehicle = vehicle;
     }
 }

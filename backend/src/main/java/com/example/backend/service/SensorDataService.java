@@ -1,12 +1,7 @@
 package com.example.backend.service;
 
-import com.example.backend.entity.AccelerometerData;
-import com.example.backend.entity.GPSData;
-import com.example.backend.entity.GyroscopeData;
-import com.example.backend.entity.User;
-import com.example.backend.repository.AccelerometerRepository;
-import com.example.backend.repository.GPSRepository;
-import com.example.backend.repository.GyroscopeRepository;
+import com.example.backend.entity.*;
+import com.example.backend.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,21 +14,45 @@ public class SensorDataService {
     private final AccelerometerRepository accelerometerRepository;
     private final GPSRepository gpsRepository;
     private final GyroscopeRepository gyroscopeRepository;
+    private final VehicleRepository vehicleRepository;
 
     @Autowired
     public SensorDataService(AccelerometerRepository accelerometerRepository,
                              GPSRepository gpsRepository,
-                             GyroscopeRepository gyroscopeRepository) {
+                             GyroscopeRepository gyroscopeRepository,
+                             VehicleRepository vehicleRepository) {
         this.accelerometerRepository = accelerometerRepository;
         this.gpsRepository = gpsRepository;
         this.gyroscopeRepository = gyroscopeRepository;
+        this.vehicleRepository = vehicleRepository;
     }
 
     // Méthodes pour l'accéléromètre
-    public AccelerometerData saveAccelerometerData(AccelerometerData data, User user) {
-        // Toujours définir le timestamp côté serveur, quelles que soient les données reçues
+    public AccelerometerData saveAccelerometerData(AccelerometerData data, User user, Long vehicleId) {
         data.setTimestamp(LocalDateTime.now());
         data.setUser(user);
+
+        if (vehicleId != null) {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+            data.setVehicle(vehicle);
+        } else if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
+        return accelerometerRepository.save(data);
+    }
+
+    public AccelerometerData saveAccelerometerData(AccelerometerData data, User user) {
+        data.setTimestamp(LocalDateTime.now());
+        data.setUser(user);
+
+        if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
         return accelerometerRepository.save(data);
     }
 
@@ -53,12 +72,40 @@ public class SensorDataService {
         return accelerometerRepository.findByUserAndDeviceId(user, deviceId);
     }
 
+    public List<AccelerometerData> getAccelerometerDataByVehicle(Vehicle vehicle) {
+        return accelerometerRepository.findByVehicle(vehicle);
+    }
+
     // Méthodes pour le GPS
+    public GPSData saveGPSData(GPSData data, User user, Long vehicleId) {
+        if (data.getTimestamp() == null) {
+            data.setTimestamp(LocalDateTime.now());
+        }
+        data.setUser(user);
+
+        if (vehicleId != null) {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+            data.setVehicle(vehicle);
+        } else if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
+        return gpsRepository.save(data);
+    }
+
     public GPSData saveGPSData(GPSData data, User user) {
         if (data.getTimestamp() == null) {
             data.setTimestamp(LocalDateTime.now());
         }
         data.setUser(user);
+
+        if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
         return gpsRepository.save(data);
     }
 
@@ -78,12 +125,40 @@ public class SensorDataService {
         return gpsRepository.findByUserAndDeviceId(user, deviceId);
     }
 
+    public List<GPSData> getGPSDataByVehicle(Vehicle vehicle) {
+        return gpsRepository.findByVehicle(vehicle);
+    }
+
     // Méthodes pour le gyroscope
+    public GyroscopeData saveGyroscopeData(GyroscopeData data, User user, Long vehicleId) {
+        if (data.getTimestamp() == null) {
+            data.setTimestamp(LocalDateTime.now());
+        }
+        data.setUser(user);
+
+        if (vehicleId != null) {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+            data.setVehicle(vehicle);
+        } else if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
+        return gyroscopeRepository.save(data);
+    }
+
     public GyroscopeData saveGyroscopeData(GyroscopeData data, User user) {
         if (data.getTimestamp() == null) {
             data.setTimestamp(LocalDateTime.now());
         }
         data.setUser(user);
+
+        if (user.getVehicles() != null && !user.getVehicles().isEmpty()) {
+            // Par défaut, on assigne le premier véhicule de l'utilisateur
+            data.setVehicle(user.getVehicles().get(0));
+        }
+
         return gyroscopeRepository.save(data);
     }
 
@@ -101,5 +176,9 @@ public class SensorDataService {
 
     public List<GyroscopeData> getGyroscopeDataByUserAndDeviceId(User user, String deviceId) {
         return gyroscopeRepository.findByUserAndDeviceId(user, deviceId);
+    }
+
+    public List<GyroscopeData> getGyroscopeDataByVehicle(Vehicle vehicle) {
+        return gyroscopeRepository.findByVehicle(vehicle);
     }
 }

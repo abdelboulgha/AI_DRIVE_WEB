@@ -24,17 +24,23 @@ public class AccelerometerData {
     @JsonIgnore
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    @JsonIgnore
+    private Vehicle vehicle;
+
     // Constructeurs
     public AccelerometerData() {
     }
 
-    public AccelerometerData(float x, float y, float z, String deviceId, LocalDateTime timestamp, User user) {
+    public AccelerometerData(float x, float y, float z, String deviceId, LocalDateTime timestamp, User user, Vehicle vehicle) {
         this.x = x;
         this.y = y;
         this.z = z;
         this.deviceId = deviceId;
         this.timestamp = timestamp;
         this.user = user;
+        this.vehicle = vehicle;
     }
 
     // Getters et Setters
@@ -86,13 +92,21 @@ public class AccelerometerData {
         this.timestamp = timestamp;
     }
 
-    // Nouveaux getters et setters pour user
     public User getUser() {
         return user;
     }
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Vehicle getVehicle() {
+        return vehicle;
+    }
+
+    // Méthode ajoutée pour résoudre l'erreur
+    public void setVehicle(Vehicle vehicle) {
+        this.vehicle = vehicle;
     }
 
     @JsonProperty("timestamp")

@@ -23,17 +23,23 @@ public class GyroscopeData {
     @JsonIgnore
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    @JsonIgnore
+    private Vehicle vehicle;
+
     // Constructeurs
     public GyroscopeData() {
     }
 
-    public GyroscopeData(float rotationX, float rotationY, float rotationZ, String deviceId, LocalDateTime timestamp, User user) {
+    public GyroscopeData(float rotationX, float rotationY, float rotationZ, String deviceId, LocalDateTime timestamp, User user, Vehicle vehicle) {
         this.rotationX = rotationX;
         this.rotationY = rotationY;
         this.rotationZ = rotationZ;
         this.deviceId = deviceId;
         this.timestamp = timestamp;
         this.user = user;
+        this.vehicle = vehicle;
     }
 
     // Getters et Setters
@@ -85,12 +91,20 @@ public class GyroscopeData {
         this.timestamp = timestamp;
     }
 
-    // Nouveaux getters et setters pour user
     public User getUser() {
         return user;
     }
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Vehicle getVehicle() {
+        return vehicle;
+    }
+
+    // Méthode ajoutée pour résoudre l'erreur
+    public void setVehicle(Vehicle vehicle) {
+        this.vehicle = vehicle;
     }
 }
