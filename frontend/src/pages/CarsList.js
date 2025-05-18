@@ -53,14 +53,14 @@ import {
   LocalGasStation as LocalGasStationIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import CarService from '../api/carService';
-import UserService from '../api/userService';
+import axios from 'axios';
 import CarForm from '../components/cars/CarForm';
-import authService from '../api/authService';
+
+const API_URL = 'http://localhost:8080/api';
 
 const CarsList = () => {
   const navigate = useNavigate();
-  const { userId } = useParams(); // Si on veut afficher les voitures d'un utilisateur spécifique
+  const { userId } = useParams();
   const isUserSpecific = !!userId;
   
   const [loading, setLoading] = useState(true);
@@ -83,17 +83,27 @@ const CarsList = () => {
     totalCars: 0,
     activeCars: 0,
     inactiveCars: 0,
-    avgSafetyScore: 0
+    avgSafetyScore: 0,
+    safetyScoreRanges: {
+      excellent: 0,
+      good: 0,
+      average: 0,
+      poor: 0
+    },
+    fuelStats: [],
+    brandStats: [],
+    totalMileage: 0,
+    alertsCount: 0
   });
   const [orderBy, setOrderBy] = useState('lastActivity');
   const [order, setOrder] = useState('desc');
   
-  const tabFilters = ['all', 'active', 'inactive'];
+  const tabFilters = ['all', 'ACTIF', 'INACTIF'];
   
   const fetchUser = async () => {
     if (isUserSpecific) {
       try {
-        const response = await UserService.getUserById(userId);
+        const response = await axios.get(`${API_URL}/users/${userId}`);
         setUserInfo(response.data);
       } catch (err) {
         console.error('Erreur lors du chargement des données utilisateur:', err);
@@ -105,23 +115,64 @@ const CarsList = () => {
     try {
       setLoading(true);
       
-      const params = {
-        page: page + 1,
-        limit: rowsPerPage,
-        search: searchTerm,
-        sort: `${orderBy}:${order}`
-      };
+      // Appel à l'API
+      let url = `${API_URL}/vehicles`;
       
-      if (tabValue > 0) {
-        params.status = tabFilters[tabValue].toUpperCase();
+      if (isUserSpecific) {
+        url = `${API_URL}/vehicles/user/${userId}`;
       }
       
-      const response = isUserSpecific
-        ? await CarService.getCarsByUserId(userId, params)
-        : await CarService.getAllCars(params);
+      const response = await axios.get(url);
       
-      setCars(response.data);
-      setTotalCars(response.meta.total);
+      // Filtrer les véhicules selon l'onglet sélectionné
+      let filteredCars = response.data;
+      if (tabValue > 0) {
+        filteredCars = response.data.filter(
+          car => car.status === tabFilters[tabValue]
+        );
+      }
+      
+      // Filtrer selon le terme de recherche
+      if (searchTerm) {
+        filteredCars = filteredCars.filter(
+          car => 
+            car.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            car.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      
+      // Tri
+      filteredCars.sort((a, b) => {
+        if (orderBy === 'lastActivity') {
+          const dateA = new Date(a.lastActivity || 0);
+          const dateB = new Date(b.lastActivity || 0);
+          return order === 'asc' ? dateA - dateB : dateB - dateA;
+        } else if (orderBy === 'year') {
+          return order === 'asc' ? a.year - b.year : b.year - a.year;
+        } else if (orderBy === 'safetyScore') {
+          return order === 'asc' ? a.safetyScore - b.safetyScore : b.safetyScore - a.safetyScore;
+        }
+        return 0;
+      });
+      
+      // Pagination côté client
+      const paginatedCars = filteredCars.slice(
+        page * rowsPerPage, 
+        page * rowsPerPage + rowsPerPage
+      );
+      
+      setCars(paginatedCars);
+      setTotalCars(filteredCars.length);
+      
+      // Mettre à jour les statistiques basiques sans attendre fetchStats
+      const activeCount = response.data.filter(car => car.status === 'ACTIF').length;
+      setStats(prevStats => ({
+        ...prevStats,
+        totalCars: response.data.length,
+        activeCars: activeCount,
+        inactiveCars: response.data.length - activeCount
+      }));
       
       setLoading(false);
     } catch (err) {
@@ -133,23 +184,94 @@ const CarsList = () => {
   
   const fetchStats = async () => {
     try {
-      const response = await CarService.getCarStats(isUserSpecific ? userId : null);
+      const response = await axios.get(`${API_URL}/vehicles/stats`);
       setStats(response.data);
     } catch (err) {
       console.error('Erreur lors du chargement des statistiques:', err);
+      
+      // En cas d'erreur, calculer des statistiques de base à partir des voitures déjà chargées
+      if (cars.length > 0) {
+        // Calculer les statistiques manuellement à partir des données
+        calculateStatsFromCars(cars);
+      }
     }
+  };
+  
+  const calculateStatsFromCars = (carsData) => {
+    // Calculer le score de sécurité moyen
+    const avgScore = carsData.reduce((sum, car) => sum + car.safetyScore, 0) / carsData.length;
+    
+    // Calculer les ranges de score de sécurité
+    const excellent = carsData.filter(car => car.safetyScore >= 90).length;
+    const good = carsData.filter(car => car.safetyScore >= 80 && car.safetyScore < 90).length;
+    const average = carsData.filter(car => car.safetyScore >= 70 && car.safetyScore < 80).length;
+    const poor = carsData.filter(car => car.safetyScore < 70).length;
+    
+    // Calculer les statistiques par type de carburant
+    const fuelTypes = {};
+    carsData.forEach(car => {
+      if (!fuelTypes[car.fuelType]) {
+        fuelTypes[car.fuelType] = 0;
+      }
+      fuelTypes[car.fuelType]++;
+    });
+    
+    const fuelStats = Object.keys(fuelTypes).map(type => {
+      const count = fuelTypes[type];
+      const percentage = Math.round((count / carsData.length) * 100);
+      return { fuelType: type, count, percentage };
+    });
+    
+    // Calculer les statistiques par marque
+    const brands = {};
+    carsData.forEach(car => {
+      if (!brands[car.brand]) {
+        brands[car.brand] = 0;
+      }
+      brands[car.brand]++;
+    });
+    
+    const brandStats = Object.keys(brands).map(brand => {
+      const count = brands[brand];
+      const percentage = Math.round((count / carsData.length) * 100);
+      return { brand, count, percentage };
+    });
+    
+    // Calculer le kilométrage total
+    const totalMileage = carsData.reduce((sum, car) => sum + (car.mileage || 0), 0);
+    
+    setStats({
+      totalCars: carsData.length,
+      activeCars: carsData.filter(car => car.status === 'ACTIF').length,
+      inactiveCars: carsData.filter(car => car.status !== 'ACTIF').length,
+      avgSafetyScore: Math.round(avgScore),
+      safetyScoreRanges: {
+        excellent,
+        good,
+        average,
+        poor
+      },
+      fuelStats,
+      brandStats,
+      totalMileage,
+      alertsCount: 0
+    });
   };
   
   useEffect(() => {
     fetchUser();
     fetchCars();
     fetchStats();
-  }, [userId, page, rowsPerPage, tabValue, orderBy, order]);
+  }, [userId]);
+  
+  // Rechargement quand les filtres/pagination/tri changent
+  useEffect(() => {
+    fetchCars();
+  }, [page, rowsPerPage, tabValue, orderBy, order, searchTerm]);
   
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(0);
-    fetchCars();
   };
   
   const handleChangePage = (event, newPage) => {
@@ -173,13 +295,13 @@ const CarsList = () => {
   };
   
   const handleMenuOpen = (event, car) => {
-    setMenuAnchorEl(event.currentTarget);
-    setSelectedCar(car);
-  };
+  setMenuAnchorEl(event.currentTarget);
+  setSelectedCar(car);
+};
   
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-  };
+ const handleMenuClose = () => {
+  setMenuAnchorEl(null);
+};
   
   const handleEditCar = () => {
     setCarFormOpen(true);
@@ -194,7 +316,7 @@ const CarsList = () => {
   
   const handleDeleteConfirm = async () => {
     try {
-      await CarService.deleteCar(carToDelete.id);
+      await axios.delete(`${API_URL}/vehicles/${carToDelete.id}`);
       fetchCars();
       fetchStats();
       setSuccessMessage(`Le véhicule ${carToDelete.brand} ${carToDelete.model} a été supprimé avec succès`);
@@ -235,14 +357,14 @@ const CarsList = () => {
   };
   
   const handleViewCarDetails = (carId) => {
-    navigate(`/cars/${carId}`);
-    handleMenuClose();
-  };
+  navigate(`/cars/${carId}`);
+  handleMenuClose();
+};
   
   const handleViewCarData = (carId) => {
-    navigate(`/cars/${carId}/data`);
-    handleMenuClose();
-  };
+  navigate(`/cars/${carId}/data`);
+  handleMenuClose();
+};
   
   const getColorBox = (color) => {
     const colorMap = {
@@ -300,7 +422,6 @@ const CarsList = () => {
         <TableHead>
           <TableRow>
             <TableCell>Véhicule</TableCell>
-            {!isUserSpecific && <TableCell>Propriétaire</TableCell>}
             <TableCell>Immatriculation</TableCell>
             <TableCell>
               <TableSortLabel
@@ -338,13 +459,13 @@ const CarsList = () => {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={isUserSpecific ? 9 : 10} align="center" sx={{ py: 3 }}>
+              <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                 <CircularProgress size={40} />
               </TableCell>
             </TableRow>
           ) : cars.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={isUserSpecific ? 9 : 10} align="center" sx={{ py: 3 }}>
+              <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                 <Typography variant="body1">
                   Aucun véhicule trouvé
                 </Typography>
@@ -372,12 +493,6 @@ const CarsList = () => {
                   </Box>
                 </TableCell>
                 
-                {!isUserSpecific && (
-                  <TableCell>
-                    {car.owner.firstName} {car.owner.lastName}
-                  </TableCell>
-                )}
-                
                 <TableCell>
                   <Chip 
                     label={car.licensePlate}
@@ -389,7 +504,7 @@ const CarsList = () => {
                 <TableCell>{car.year}</TableCell>
                 
                 <TableCell>
-                  {car.mileage.toLocaleString()} km
+                  {car.mileage ? car.mileage.toLocaleString() : 0} km
                 </TableCell>
                 
                 <TableCell>
@@ -411,10 +526,10 @@ const CarsList = () => {
                 
                 <TableCell>
                   <Chip 
-                    icon={car.status === 'ACTIVE' ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
-                    label={car.status === 'ACTIVE' ? 'Actif' : 'Inactif'} 
+                    icon={car.status === 'ACTIF' ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
+                    label={car.status === 'ACTIF' ? 'Actif' : 'Inactif'} 
                     size="small" 
-                    color={car.status === 'ACTIVE' ? 'success' : 'default'} 
+                    color={car.status === 'ACTIF' ? 'success' : 'default'} 
                   />
                 </TableCell>
                 
@@ -535,10 +650,10 @@ const CarsList = () => {
               }}>
                 <CircularProgress 
                   variant="determinate" 
-                  value={stats.avgSafetyScore} 
+                  value={stats.avgSafetyScore || 0} 
                   size={100}
                   thickness={5}
-                  sx={{ color: getSafetyScoreColor(stats.avgSafetyScore) + '.main' }}
+                  sx={{ color: getSafetyScoreColor(stats.avgSafetyScore || 0) + '.main' }}
                 />
                 <Box
                   sx={{
@@ -550,7 +665,7 @@ const CarsList = () => {
                   }}
                 >
                   <Typography variant="h4" fontWeight="bold">
-                    {stats.avgSafetyScore}%
+                    {stats.avgSafetyScore || 0}%
                   </Typography>
                 </Box>
               </Box>
@@ -689,7 +804,7 @@ const CarsList = () => {
                     Total kilométrage
                   </Typography>
                   <Typography variant="h6" fontWeight="medium">
-                    {stats.totalMileage?.toLocaleString()} km
+                    {stats.totalMileage?.toLocaleString() || 0} km
                   </Typography>
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
@@ -792,29 +907,30 @@ const CarsList = () => {
       </Paper>
       
       {/* Menu contextuel pour actions véhicule */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleViewCarDetails}>
-          <BarChartIcon fontSize="small" sx={{ mr: 1 }} />
-          Voir détails
-        </MenuItem>
-        <MenuItem onClick={handleViewCarData}>
-          <TimelineIcon fontSize="small" sx={{ mr: 1 }} />
-          Visualiser données
-        </MenuItem>
-        <MenuItem onClick={handleEditCar}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Modifier
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Supprimer
-        </MenuItem>
-      </Menu>
+      // Menu contextuel pour actions véhicule
+<Menu
+  anchorEl={menuAnchorEl}
+  open={Boolean(menuAnchorEl)}
+  onClose={handleMenuClose}
+>
+  <MenuItem onClick={() => handleViewCarDetails(selectedCar.id)}>
+    <BarChartIcon fontSize="small" sx={{ mr: 1 }} />
+    Voir détails
+  </MenuItem>
+  <MenuItem onClick={() => handleViewCarData(selectedCar.id)}>
+    <TimelineIcon fontSize="small" sx={{ mr: 1 }} />
+    Visualiser données
+  </MenuItem>
+  <MenuItem onClick={handleEditCar}>
+    <EditIcon fontSize="small" sx={{ mr: 1 }} />
+    Modifier
+  </MenuItem>
+  <Divider />
+  <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
+    <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+    Supprimer
+  </MenuItem>
+</Menu>
       
       {/* Dialog de confirmation de suppression */}
       <Dialog
@@ -845,7 +961,7 @@ const CarsList = () => {
         open={carFormOpen}
         handleClose={handleFormClose}
         car={selectedCar}
-        userId={isUserSpecific ? parseInt(userId) : (selectedCar?.userId || null)}
+        userId={isUserSpecific ? parseInt(userId) : null}
         onSave={handleCarSaved}
       />
       

@@ -114,39 +114,39 @@ function App() {
       <CssBaseline />
       <Router>
         <Routes>
-          {/* Routes publiques */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          
-          {/* Routes protégées */}
-          <Route path="/" element={<Layout />}>
-            <Route index element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-            
-            {/* Routes de données capteurs */}
-            <Route path="accelerometer" element={<PrivateRoute><AccelerometerData /></PrivateRoute>} />
-            <Route path="gps" element={<PrivateRoute><GPSData /></PrivateRoute>} />
-            <Route path="gyroscope" element={<PrivateRoute><GyroscopeData /></PrivateRoute>} />
-            
-            {/* Routes de gestion des utilisateurs */}
-            <Route path="users" element={<AdminRoute><UsersList /></AdminRoute>} />
-            <Route path="users/:userId" element={<AdminRoute><UserProfile /></AdminRoute>} />
-            <Route path="users/:userId/cars" element={<AdminRoute><CarsList /></AdminRoute>} />
-            <Route path="profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
-            
-            {/* Routes de gestion des véhicules */}
-            <Route path="cars" element={<PrivateRoute><CarsList /></PrivateRoute>} />
-            <Route path="cars/:carId" element={<PrivateRoute><CarDetails /></PrivateRoute>} />
-            <Route path="cars/:carId/data" element={<PrivateRoute><CarData /></PrivateRoute>} />
-            
-            {/* Routes de gestion des alertes */}
-            <Route path="alerts" element={<PrivateRoute><AlertsList /></PrivateRoute>} />
-            <Route path="alerts/:alertId" element={<PrivateRoute><AlertDetails /></PrivateRoute>} />
-          </Route>
-          
-          {/* Redirection par défaut */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+  {/* Routes publiques */}
+  <Route path="/login" element={<Login />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/reset-password/:token" element={<ResetPassword />} />
+  
+  {/* Routes protégées */}
+  <Route path="/" element={<Layout />}>
+    <Route index element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+    
+    {/* Routes de données capteurs */}
+    <Route path="accelerometer" element={<PrivateRoute><AccelerometerData /></PrivateRoute>} />
+    <Route path="gps" element={<PrivateRoute><GPSData /></PrivateRoute>} />
+    <Route path="gyroscope" element={<PrivateRoute><GyroscopeData /></PrivateRoute>} />
+    
+    {/* Routes de gestion des utilisateurs */}
+    <Route path="users" element={<AdminRoute><UsersList /></AdminRoute>} />
+    <Route path="users/:userId" element={<AdminRoute><UserProfile /></AdminRoute>} />
+    <Route path="users/:userId/cars" element={<AdminRoute><CarsList /></AdminRoute>} />
+    <Route path="profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
+    
+    {/* Routes de gestion des véhicules */}
+    <Route path="cars" element={<PrivateRoute><CarsList /></PrivateRoute>} />
+    <Route path="cars/:carId" element={<PrivateRoute><CarDetails /></PrivateRoute>} />
+    <Route path="cars/:carId/data" element={<PrivateRoute><CarData /></PrivateRoute>} />
+    
+    {/* Routes de gestion des alertes */}
+    <Route path="alerts" element={<PrivateRoute><AlertsList /></PrivateRoute>} />
+    <Route path="alerts/:alertId" element={<PrivateRoute><AlertDetails /></PrivateRoute>} />
+  </Route>
+  
+  {/* Redirection par défaut */}
+  <Route path="*" element={<Navigate to="/login" replace />} />
+</Routes>
       </Router>
     </ThemeProvider>
   );
