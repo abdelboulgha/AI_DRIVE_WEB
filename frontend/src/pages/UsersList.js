@@ -49,7 +49,7 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import UserService from '../api/userService';
+import axios from 'axios';
 import UserForm from '../components/users/UserForm';
 
 const UsersList = () => {
@@ -75,25 +75,45 @@ const UsersList = () => {
     inactiveUsers: 0
   });
   
-  const tabFilters = ['all', 'active', 'inactive'];
+  const tabFilters = ['all', 'ACTIF', 'INACTIF'];
   
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      // Appel à votre endpoint
+      const response = await axios.get('http://localhost:8080/api/auth/users');
       
-      const params = {
-        page: page + 1,
-        limit: rowsPerPage,
-        search: searchTerm,
-      };
-      
+      // Filtrage selon l'onglet sélectionné
+      let filteredUsers = response.data;
       if (tabValue > 0) {
-        params.status = tabFilters[tabValue].toUpperCase();
+        filteredUsers = response.data.filter(user => user.status === tabFilters[tabValue]);
       }
       
-      const response = await UserService.getAllUsers(params);
-      setUsers(response.data);
-      setTotalUsers(response.meta.total);
+      // Filtrage selon le terme de recherche
+      if (searchTerm) {
+        filteredUsers = filteredUsers.filter(user => 
+          user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (user.telephone && user.telephone.includes(searchTerm))
+        );
+      }
+      
+      // Pagination simple côté client
+      const paginatedUsers = filteredUsers.slice(
+        page * rowsPerPage, 
+        page * rowsPerPage + rowsPerPage
+      );
+      
+      setUsers(paginatedUsers);
+      setTotalUsers(filteredUsers.length);
+      
+      // Calcul des statistiques
+      const activeUsers = response.data.filter(user => user.status === 'ACTIF').length;
+      setStats({
+        totalUsers: response.data.length,
+        activeUsers,
+        inactiveUsers: response.data.length - activeUsers
+      });
       
       setLoading(false);
     } catch (err) {
@@ -103,24 +123,13 @@ const UsersList = () => {
     }
   };
   
-  const fetchStats = async () => {
-    try {
-      const response = await UserService.getUserStats();
-      setStats(response.data);
-    } catch (err) {
-      console.error('Erreur lors du chargement des statistiques:', err);
-    }
-  };
-  
   useEffect(() => {
     fetchUsers();
-    fetchStats();
-  }, [page, rowsPerPage, tabValue]);
+  }, [page, rowsPerPage, tabValue, searchTerm]);
   
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(0);
-    fetchUsers();
   };
   
   const handleChangePage = (event, newPage) => {
@@ -159,10 +168,10 @@ const UsersList = () => {
   
   const handleDeleteConfirm = async () => {
     try {
-      await UserService.deleteUser(userToDelete.id);
+      // Implémenter la suppression d'utilisateur
+      await axios.delete(`http://localhost:8080/api/auth/users/${userToDelete.id}`);
       fetchUsers();
-      fetchStats();
-      setSuccessMessage(`L'utilisateur ${userToDelete.firstName} ${userToDelete.lastName} a été supprimé avec succès`);
+      setSuccessMessage(`L'utilisateur ${userToDelete.username} a été supprimé avec succès`);
       setSnackbarOpen(true);
     } catch (err) {
       setError(`Erreur lors de la suppression: ${err.response?.data?.message || 'Une erreur est survenue'}`);
@@ -190,7 +199,6 @@ const UsersList = () => {
   
   const handleUserSaved = () => {
     fetchUsers();
-    fetchStats();
     setUserFormOpen(false);
     setSuccessMessage(selectedUser 
       ? `L'utilisateur a été mis à jour avec succès` 
@@ -202,32 +210,6 @@ const UsersList = () => {
   const handleViewUserCars = (userId) => {
     navigate(`/users/${userId}/cars`);
     handleMenuClose();
-  };
-  
-  const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
-  };
-  
-  const getRoleColor = (role) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'error';
-      case 'MANAGER':
-        return 'warning';
-      default:
-        return 'primary';
-    }
-  };
-  
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'ADMIN':
-        return <ShieldIcon fontSize="small" />;
-      case 'MANAGER':
-        return <PersonIcon fontSize="small" />;
-      default:
-        return null;
-    }
   };
   
   return (
@@ -286,65 +268,7 @@ const UsersList = () => {
           </Card>
         </Grid>
         
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6" color="text.secondary">
-                  Par rôle
-                </Typography>
-                <Avatar sx={{ bgcolor: 'warning.main' }}>
-                  <ShieldIcon />
-                </Avatar>
-              </Box>
-              <Box sx={{ my: 2 }}>
-                <Grid container spacing={1}>
-                  <Grid item xs={4}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        {stats.adminUsers || 0}
-                      </Typography>
-                      <Chip 
-                        label="Admin" 
-                        size="small" 
-                        color="error" 
-                        sx={{ mt: 1 }}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        {stats.managerUsers || 0}
-                      </Typography>
-                      <Chip 
-                        label="Manager" 
-                        size="small" 
-                        color="warning" 
-                        sx={{ mt: 1 }}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        {stats.regularUsers || 0}
-                      </Typography>
-                      <Chip 
-                        label="Utilisateur" 
-                        size="small" 
-                        color="primary" 
-                        sx={{ mt: 1 }}
-                      />
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={8}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -358,7 +282,7 @@ const UsersList = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-around', my: 2 }}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                    {stats.usersWithCars || 0}
+                    {users.filter(u => u.vehicles && u.vehicles.length > 0).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Avec véhicules
@@ -366,7 +290,7 @@ const UsersList = () => {
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                    {stats.usersWithoutCars || 0}
+                    {users.filter(u => !u.vehicles || u.vehicles.length === 0).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Sans véhicule
@@ -447,7 +371,7 @@ const UsersList = () => {
           </Alert>
         )}
         
-        {/* Tableau des utilisateurs */}
+        {/* Tableau des utilisateurs - MODIFIÉ POUR CORRESPONDRE À VOTRE FORMAT DE DONNÉES */}
         <TableContainer>
           <Table>
             <TableHead>
@@ -455,23 +379,21 @@ const UsersList = () => {
                 <TableCell>Utilisateur</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Téléphone</TableCell>
-                <TableCell>Rôle</TableCell>
                 <TableCell>Statut</TableCell>
                 <TableCell align="center">Véhicules</TableCell>
-                <TableCell>Dernière connexion</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                     <CircularProgress size={40} />
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                     <Typography variant="body1">
                       Aucun utilisateur trouvé
                     </Typography>
@@ -483,11 +405,11 @@ const UsersList = () => {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                          {getInitials(user.firstName, user.lastName)}
+                          {user.username.charAt(0).toUpperCase()}
                         </Avatar>
                         <Box>
                           <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                            {user.firstName} {user.lastName}
+                            {user.username}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             ID: {user.id}
@@ -496,27 +418,18 @@ const UsersList = () => {
                       </Box>
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.phone}</TableCell>
+                    <TableCell>{user.telephone || "Non renseigné"}</TableCell>
                     <TableCell>
                       <Chip 
-                        icon={getRoleIcon(user.role)}
-                        label={user.role} 
+                        icon={user.status === 'ACTIF' ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
+                        label={user.status} 
                         size="small" 
-                        color={getRoleColor(user.role)} 
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        icon={user.status === 'ACTIVE' ? <CheckCircleIcon fontSize="small" /> : <CancelIcon fontSize="small" />}
-                        label={user.status === 'ACTIVE' ? 'Actif' : 'Inactif'} 
-                        size="small" 
-                        color={user.status === 'ACTIVE' ? 'success' : 'default'} 
+                        color={user.status === 'ACTIF' ? 'success' : 'default'} 
                       />
                     </TableCell>
                     <TableCell align="center">
                       <Badge 
-                        badgeContent={user.carsCount} 
+                        badgeContent={user.vehicles ? user.vehicles.length : 0} 
                         color="primary"
                         showZero
                         sx={{ 
@@ -527,12 +440,9 @@ const UsersList = () => {
                         }}
                       >
                         <DirectionsCarIcon 
-                          color={user.carsCount > 0 ? "primary" : "disabled"} 
+                          color={user.vehicles && user.vehicles.length > 0 ? "primary" : "disabled"} 
                         />
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Jamais'}
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
@@ -594,7 +504,7 @@ const UsersList = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Êtes-vous sûr de vouloir supprimer l'utilisateur {userToDelete?.firstName} {userToDelete?.lastName} ?
+            Êtes-vous sûr de vouloir supprimer l'utilisateur {userToDelete?.username} ?
             Cette action est irréversible et supprimera également toutes les données associées.
           </DialogContentText>
         </DialogContent>
