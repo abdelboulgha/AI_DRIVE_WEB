@@ -18,7 +18,6 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import SpeedIcon from '@mui/icons-material/Speed';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ThreeSixtyIcon from '@mui/icons-material/ThreeSixty';
@@ -29,24 +28,18 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import SettingsIcon from '@mui/icons-material/Settings';
-import HelpIcon from '@mui/icons-material/Help';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import authService from '../../api/authService';
 
 const drawerWidth = 240;
 
 // Menu principal pour tous les utilisateurs
-const mainMenuItems = [
-  { text: 'Tableau de bord', icon: <DashboardIcon />, path: '/' }
-];
 
 // Menu de surveillance des capteurs
 const sensorMenuItems = [
   { text: 'Accéléromètre', icon: <SpeedIcon />, path: '/accelerometer' },
   { text: 'GPS', icon: <LocationOnIcon />, path: '/gps' },
   { text: 'Gyroscope', icon: <ThreeSixtyIcon />, path: '/gyroscope' },
-  { text: 'Appareils', icon: <DevicesOtherIcon />, path: '/devices' }
 ];
 
 // Menu administrateur
@@ -107,9 +100,6 @@ const Sidebar = ({ open, onClose }) => {
         <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
           AI-Drive
         </Typography>
-        <Typography variant="caption">
-          v1.2.0
-        </Typography>
       </Box>
       
       <Divider />
@@ -145,33 +135,6 @@ const Sidebar = ({ open, onClose }) => {
       
       {/* Liste principale */}
       <List component="nav" sx={{ px: 1 }}>
-        {mainMenuItems.map((item) => (
-          <ListItem
-            button
-            key={item.text}
-            component={Link}
-            to={item.path}
-            onClick={handleItemClick}
-            selected={location.pathname === item.path}
-            sx={{
-              borderRadius: 1,
-              mb: 0.5,
-              '&.Mui-selected': {
-                backgroundColor: 'primary.light',
-                '&:hover': {
-                  backgroundColor: 'primary.light',
-                },
-              },
-            }}
-          >
-            <ListItemIcon 
-              sx={{ color: location.pathname === item.path ? 'primary.main' : 'inherit' }}
-            >
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
         
         {/* Sous-menu capteurs */}
         <ListItemButton 
@@ -321,19 +284,6 @@ const Sidebar = ({ open, onClose }) => {
       {/* Menu bas de page */}
       <List sx={{ px: 1 }}>
         <Divider sx={{ my: 1 }} />
-        <ListItem 
-          button 
-          component={Link} 
-          to="/profile"
-          onClick={handleItemClick}
-          selected={location.pathname === '/profile'}
-          sx={{ borderRadius: 1 }}
-        >
-          <ListItemIcon>
-            <PersonIcon />
-          </ListItemIcon>
-          <ListItemText primary="Mon profil" />
-        </ListItem>
 
         <ListItem button onClick={handleLogout} sx={{ borderRadius: 1 }}>
           <ListItemIcon>

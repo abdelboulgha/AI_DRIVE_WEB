@@ -103,15 +103,6 @@ const Navbar = ({ toggleSidebar }) => {
     navigate('/login');
   };
   
-  const handleProfileClick = () => {
-    navigate('/profile');
-    handleProfileClose();
-  };
-  
-  const handleSettingsClick = () => {
-    navigate('/settings');
-    handleProfileClose();
-  };
   
   const handleNotificationClick = (alertId) => {
     navigate(`/alerts/${alertId}`);
@@ -286,7 +277,6 @@ const Navbar = ({ toggleSidebar }) => {
           </Menu>
           
           {/* Bouton de profil */}
-          <Tooltip title="Profil">
             <IconButton 
               color="inherit"
               onClick={handleProfileOpen}
@@ -296,7 +286,6 @@ const Navbar = ({ toggleSidebar }) => {
                 {isAdmin ? 'A' : 'U'}
               </Avatar>
             </IconButton>
-          </Tooltip>
           
           {/* Menu de profil */}
           <Menu
@@ -309,20 +298,7 @@ const Navbar = ({ toggleSidebar }) => {
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
-            <MenuItem onClick={handleProfileClick}>
-              <ListItemIcon>
-                <PersonIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Mon profil" />
-            </MenuItem>
-            
-            <MenuItem onClick={handleSettingsClick}>
-              <ListItemIcon>
-                <SettingsIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Paramètres" />
-            </MenuItem>
-            
+
             <Divider />
             
             <MenuItem onClick={handleLogout}>
