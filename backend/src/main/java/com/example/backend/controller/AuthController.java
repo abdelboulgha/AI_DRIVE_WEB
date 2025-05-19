@@ -55,5 +55,7 @@ public class AuthController {
         } catch (Exception e) {
             throw new RuntimeException("Error retrieving users: " + e.getMessage());
         }
+
+
     }
 }

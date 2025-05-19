@@ -1,9 +1,7 @@
 package com.example.backend.controller;
 
-import com.example.backend.entity.AccelerometerData;
-import com.example.backend.entity.GPSData;
-import com.example.backend.entity.GyroscopeData;
-import com.example.backend.entity.User;
+import com.example.backend.entity.*;
+import com.example.backend.repository.VehicleRepository;
 import com.example.backend.service.AuthService;
 import com.example.backend.service.SensorDataService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,11 +18,13 @@ public class SensorDataController {
 
     private final SensorDataService sensorDataService;
     private final AuthService authService;
+    private VehicleRepository vehicleRepository;
 
     @Autowired
-    public SensorDataController(SensorDataService sensorDataService, AuthService authService) {
+    public SensorDataController(SensorDataService sensorDataService, AuthService authService, VehicleRepository vehicleRepository) {
         this.sensorDataService = sensorDataService;
         this.authService = authService;
+        this.vehicleRepository=vehicleRepository;
     }
 
     // Endpoints pour l'accéléromètre
@@ -62,6 +62,48 @@ public class SensorDataController {
         User user = authService.getUserByToken(token);
         GPSData savedData = sensorDataService.saveGPSData(data, user);
         return new ResponseEntity<>(savedData, HttpStatus.CREATED);
+    }
+
+    // Ajoutez cette méthode dans SensorDataController.java
+    @GetMapping("/accelerometer/vehicle/{vehicleId}")
+    public ResponseEntity<List<AccelerometerData>> getAccelerometerDataByVehicleId(@PathVariable Long vehicleId) {
+        try {
+            // Récupérer le véhicule par ID
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found with id: " + vehicleId));
+
+            // Récupérer les données d'accéléromètre pour ce véhicule
+            List<AccelerometerData> data = sensorDataService.getAccelerometerDataByVehicle(vehicle);
+            return new ResponseEntity<>(data, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @GetMapping("/gps/vehicle/{vehicleId}")
+    public ResponseEntity<List<GPSData>> getGPSDataByVehicleId(@PathVariable Long vehicleId) {
+        try {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found with id: " + vehicleId));
+
+            List<GPSData> data = sensorDataService.getGPSDataByVehicle(vehicle);
+            return new ResponseEntity<>(data, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @GetMapping("/gyroscope/vehicle/{vehicleId}")
+    public ResponseEntity<List<GyroscopeData>> getGyroscopeDataByVehicleId(@PathVariable Long vehicleId) {
+        try {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new RuntimeException("Vehicle not found with id: " + vehicleId));
+
+            List<GyroscopeData> data = sensorDataService.getGyroscopeDataByVehicle(vehicle);
+            return new ResponseEntity<>(data, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 
     @GetMapping("/gps")
