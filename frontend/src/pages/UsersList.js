@@ -46,7 +46,8 @@ import {
   Person as PersonIcon,
   Shield as ShieldIcon,
   CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  LockOpen as LockOpenIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -69,6 +70,7 @@ const UsersList = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [unsecuredDelete, setUnsecuredDelete] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -163,20 +165,51 @@ const UsersList = () => {
   const handleDeleteClick = () => {
     setUserToDelete(selectedUser);
     setDeleteDialogOpen(true);
+    setUnsecuredDelete(false);
+    handleMenuClose();
+  };
+  
+  const handleDeleteUnsecuredClick = () => {
+    setUserToDelete(selectedUser);
+    setDeleteDialogOpen(true);
+    setUnsecuredDelete(true);
     handleMenuClose();
   };
   
   const handleDeleteConfirm = async () => {
     try {
-      // Implémenter la suppression d'utilisateur
-      await axios.delete(`http://localhost:8080/api/auth/users/${userToDelete.id}`);
+      setLoading(true);
+      
+      // Choisir l'endpoint approprié selon le mode de suppression
+      const endpoint = unsecuredDelete 
+        ? `http://localhost:8080/api/auth/users/delete-unsecured/${userToDelete.id}`
+        : `http://localhost:8080/api/auth/users/${userToDelete.id}`;
+      // Appel à l'API pour supprimer l'utilisateur
+      await axios.delete(endpoint);
+      
+      // Mettre à jour la liste des utilisateurs
       fetchUsers();
-      setSuccessMessage(`L'utilisateur ${userToDelete.username} a été supprimé avec succès`);
+      
+      // Afficher un message de succès
+      const successText = unsecuredDelete 
+        ? `L'utilisateur ${userToDelete.username} a été supprimé avec succès (sans sécurité)`
+        : `L'utilisateur ${userToDelete.username} a été supprimé avec succès`;
+      
+      setSuccessMessage(successText);
       setSnackbarOpen(true);
     } catch (err) {
-      setError(`Erreur lors de la suppression: ${err.response?.data?.message || 'Une erreur est survenue'}`);
+      console.error('Erreur lors de la suppression:', err);
+      
+      // Afficher un message d'erreur
+      let errorMessage = 'Une erreur est survenue lors de la suppression';
+      if (err.response && err.response.data && err.response.data.error) {
+        errorMessage = err.response.data.error;
+      }
+      
+      setError(errorMessage);
       setSnackbarOpen(true);
     } finally {
+      setLoading(false);
       setDeleteDialogOpen(false);
       setUserToDelete(null);
     }
@@ -218,15 +251,6 @@ const UsersList = () => {
         <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>
           Gestion des utilisateurs
         </Typography>
-        
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleCreateUser}
-        >
-          Nouvel utilisateur
-        </Button>
       </Box>
       
       {/* Statistiques */}
@@ -371,7 +395,7 @@ const UsersList = () => {
           </Alert>
         )}
         
-        {/* Tableau des utilisateurs - MODIFIÉ POUR CORRESPONDRE À VOTRE FORMAT DE DONNÉES */}
+        {/* Tableau des utilisateurs */}
         <TableContainer>
           <Table>
             <TableHead>
@@ -479,17 +503,13 @@ const UsersList = () => {
         open={Boolean(menuAnchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleEditUser}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Modifier
-        </MenuItem>
         <MenuItem onClick={() => handleViewUserCars(selectedUser?.id)}>
           <DirectionsCarIcon fontSize="small" sx={{ mr: 1 }} />
           Voir les véhicules
         </MenuItem>
         <Divider />
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+        <MenuItem onClick={handleDeleteUnsecuredClick} sx={{ color: 'error.main' }}>
+          <LockOpenIcon fontSize="small" sx={{ mr: 1 }} />
           Supprimer
         </MenuItem>
       </Menu>
@@ -505,15 +525,22 @@ const UsersList = () => {
         <DialogContent>
           <DialogContentText>
             Êtes-vous sûr de vouloir supprimer l'utilisateur {userToDelete?.username} ?
-            Cette action est irréversible et supprimera également toutes les données associées.
+            {unsecuredDelete 
+              ? " Cette action est irréversible et sera effectuée sans vérification de sécurité." 
+              : " Cette action est irréversible et supprimera également toutes les données associées."
+            }
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel}>
             Annuler
           </Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Supprimer
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+          >
+            {unsecuredDelete ? "Supprimer (sans sécurité)" : "Supprimer"}
           </Button>
         </DialogActions>
       </Dialog>

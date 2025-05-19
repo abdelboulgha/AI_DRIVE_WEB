@@ -50,7 +50,8 @@ import {
   Timeline as TimelineIcon,
   Speed as SpeedIcon,
   ColorLens as ColorLensIcon,
-  LocalGasStation as LocalGasStationIcon
+  LocalGasStation as LocalGasStationIcon,
+  LockOpen as LockOpenIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -79,6 +80,8 @@ const CarsList = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const [unsecuredDelete, setUnsecuredDelete] = useState(false);
+  const [unsecuredEdit, setUnsecuredEdit] = useState(false);
   const [stats, setStats] = useState({
     totalCars: 0,
     activeCars: 0,
@@ -295,15 +298,22 @@ const CarsList = () => {
   };
   
   const handleMenuOpen = (event, car) => {
-  setMenuAnchorEl(event.currentTarget);
-  setSelectedCar(car);
-};
+    setMenuAnchorEl(event.currentTarget);
+    setSelectedCar(car);
+  };
   
- const handleMenuClose = () => {
-  setMenuAnchorEl(null);
-};
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
   
   const handleEditCar = () => {
+    setUnsecuredEdit(false);
+    setCarFormOpen(true);
+    handleMenuClose();
+  };
+  
+  const handleEditCarUnsecured = () => {
+    setUnsecuredEdit(true);
     setCarFormOpen(true);
     handleMenuClose();
   };
@@ -311,6 +321,14 @@ const CarsList = () => {
   const handleDeleteClick = () => {
     setCarToDelete(selectedCar);
     setDeleteDialogOpen(true);
+    setUnsecuredDelete(false);
+    handleMenuClose();
+  };
+  
+  const handleDeleteUnsecuredClick = () => {
+    setCarToDelete(selectedCar);
+    setDeleteDialogOpen(true);
+    setUnsecuredDelete(true);
     handleMenuClose();
   };
   
@@ -330,6 +348,22 @@ const CarsList = () => {
     }
   };
   
+  const handleDeleteUnsecured = async () => {
+    try {
+      await axios.delete(`${API_URL}/vehicles/delete-unsecured/${carToDelete.id}`);
+      fetchCars();
+      fetchStats();
+      setSuccessMessage(`Le véhicule ${carToDelete.brand} ${carToDelete.model} a été supprimé avec succès (sans sécurité)`);
+      setSnackbarOpen(true);
+    } catch (err) {
+      setError(`Erreur lors de la suppression: ${err.response?.data?.message || 'Une erreur est survenue'}`);
+      setSnackbarOpen(true);
+    } finally {
+      setDeleteDialogOpen(false);
+      setCarToDelete(null);
+    }
+  };
+  
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setCarToDelete(null);
@@ -337,34 +371,54 @@ const CarsList = () => {
   
   const handleCreateCar = () => {
     setSelectedCar(null);
+    setUnsecuredEdit(false);
     setCarFormOpen(true);
   };
   
   const handleFormClose = () => {
     setCarFormOpen(false);
     setSelectedCar(null);
+    setUnsecuredEdit(false);
   };
   
-  const handleCarSaved = () => {
-    fetchCars();
-    fetchStats();
-    setCarFormOpen(false);
-    setSuccessMessage(selectedCar 
-      ? `Le véhicule a été mis à jour avec succès` 
-      : `Nouveau véhicule créé avec succès`
-    );
-    setSnackbarOpen(true);
+  const handleCarSaved = async (carData) => {
+    try {
+      if (selectedCar) {
+        // Édition
+        if (unsecuredEdit) {
+          // Appel à l'API sans sécurité
+          await axios.put(`${API_URL}/vehicles/update-unsecured/${selectedCar.id}`, carData);
+          setSuccessMessage(`Le véhicule ${carData.brand} ${carData.model} a été mis à jour avec succès (sans sécurité)`);
+        } else {
+          // Appel normal avec sécurité
+          await axios.put(`${API_URL}/vehicles/${selectedCar.id}`, carData);
+          setSuccessMessage(`Le véhicule ${carData.brand} ${carData.model} a été mis à jour avec succès`);
+        }
+      } else {
+        // Création
+        await axios.post(`${API_URL}/vehicles`, carData);
+        setSuccessMessage(`Nouveau véhicule ${carData.brand} ${carData.model} créé avec succès`);
+      }
+      
+      fetchCars();
+      fetchStats();
+      setCarFormOpen(false);
+      setSnackbarOpen(true);
+    } catch (err) {
+      setError(`Erreur lors de l'enregistrement: ${err.response?.data?.message || 'Une erreur est survenue'}`);
+      setSnackbarOpen(true);
+    }
   };
   
   const handleViewCarDetails = (carId) => {
-  navigate(`/cars/${carId}`);
-  handleMenuClose();
-};
+    navigate(`/cars/${carId}`);
+    handleMenuClose();
+  };
   
   const handleViewCarData = (carId) => {
-  navigate(`/cars/${carId}/data`);
-  handleMenuClose();
-};
+    navigate(`/cars/${carId}/data`);
+    handleMenuClose();
+  };
   
   const getColorBox = (color) => {
     const colorMap = {
@@ -907,30 +961,29 @@ const CarsList = () => {
       </Paper>
       
       {/* Menu contextuel pour actions véhicule */}
-      // Menu contextuel pour actions véhicule
-<Menu
-  anchorEl={menuAnchorEl}
-  open={Boolean(menuAnchorEl)}
-  onClose={handleMenuClose}
->
-  <MenuItem onClick={() => handleViewCarDetails(selectedCar.id)}>
-    <BarChartIcon fontSize="small" sx={{ mr: 1 }} />
-    Voir détails
-  </MenuItem>
-  <MenuItem onClick={() => handleViewCarData(selectedCar.id)}>
-    <TimelineIcon fontSize="small" sx={{ mr: 1 }} />
-    Visualiser données
-  </MenuItem>
-  <MenuItem onClick={handleEditCar}>
-    <EditIcon fontSize="small" sx={{ mr: 1 }} />
-    Modifier
-  </MenuItem>
-  <Divider />
-  <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-    <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-    Supprimer
-  </MenuItem>
-</Menu>
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={() => handleViewCarDetails(selectedCar?.id)}>
+          <BarChartIcon fontSize="small" sx={{ mr: 1 }} />
+          Voir détails
+        </MenuItem>
+        <MenuItem onClick={() => handleViewCarData(selectedCar?.id)}>
+          <TimelineIcon fontSize="small" sx={{ mr: 1 }} />
+          Visualiser données
+        </MenuItem>
+        <MenuItem onClick={handleEditCarUnsecured}>
+          <LockOpenIcon fontSize="small" sx={{ mr: 1 }} />
+          Modifier
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleDeleteUnsecuredClick} sx={{ color: 'error.main' }}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Supprimer
+        </MenuItem>
+      </Menu>
       
       {/* Dialog de confirmation de suppression */}
       <Dialog
@@ -943,15 +996,22 @@ const CarsList = () => {
         <DialogContent>
           <DialogContentText>
             Êtes-vous sûr de vouloir supprimer le véhicule {carToDelete?.brand} {carToDelete?.model} ({carToDelete?.licensePlate}) ?
-            Cette action est irréversible et supprimera également toutes les données associées.
+            {unsecuredDelete 
+              ? " Cette action est irréversible et sera effectuée sans vérification de sécurité." 
+              : " Cette action est irréversible et supprimera également toutes les données associées."
+            }
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDeleteCancel}>
             Annuler
           </Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Supprimer
+          <Button 
+            onClick={unsecuredDelete ? handleDeleteUnsecured : handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+          >
+            {unsecuredDelete ? "Supprimer" : "Supprimer"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -963,6 +1023,7 @@ const CarsList = () => {
         car={selectedCar}
         userId={isUserSpecific ? parseInt(userId) : null}
         onSave={handleCarSaved}
+        unsecuredEdit={unsecuredEdit}
       />
       
       {/* Snackbar de notification */}
