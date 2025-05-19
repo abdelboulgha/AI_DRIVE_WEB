@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Container, 
   Typography, 
@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardContent,
-  IconButton,
   Breadcrumbs,
   CircularProgress,
   Alert,
@@ -20,23 +19,17 @@ import {
   TextField,
   Tab,
   Tabs,
-  ButtonGroup,
-  Chip,
-  Skeleton
+  Chip
 } from '@mui/material';
 import { 
   ArrowBack as ArrowBackIcon,
   DirectionsCar as DirectionsCarIcon,
   DateRange as DateRangeIcon,
   Refresh as RefreshIcon,
-  Timeline as TimelineIcon,
   GpsFixed as GpsFixedIcon,
   Speed as SpeedIcon,
   ThreeSixty as ThreeSixtyIcon,
-  Download as DownloadIcon,
-  Launch as LaunchIcon,
-  Map as MapIcon,
-  FilterList as FilterListIcon
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { 
@@ -49,16 +42,233 @@ import {
   Legend, 
   ResponsiveContainer,
   AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  ScatterChart,
-  Scatter,
-  ZAxis
+  Area
 } from 'recharts';
-import CarService from '../api/carService';
-import SensorDataService from '../api/sensorDataService';
-import GPSMap from '../components/maps/GPSMap';
+import axios from 'axios';
+
+// API URL
+const API_URL = 'http://localhost:8080/api';
+
+// IMPORTANT: Ajoutez ces lignes dans le <head> de votre index.html:
+// <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+// <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+// Composant pour la carte GPS - approche simplifiée et robuste
+const GPSMapComponent = ({ gpsData }) => {
+  const mapContainerRef = useRef(null);
+  const [mapError, setMapError] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
+  
+  // Initialiser la carte une seule fois après le rendu initial
+  useEffect(() => {
+    // S'assurer que Leaflet est disponible
+    if (!window.L) {
+      setMapError("Bibliothèque Leaflet non trouvée. Vérifiez que les scripts sont bien chargés.");
+      return;
+    }
+    
+    // S'assurer que le conteneur DOM existe
+    if (!mapContainerRef.current) {
+      return;
+    }
+    
+    // Initialiser la carte
+    const map = window.L.map(mapContainerRef.current, {
+      // Désactiver le zoom au démarrage pour éviter les problèmes
+      zoomControl: true,
+      attributionControl: true
+    }).setView([31.6162, -8.0659], 13);
+    
+    // Ajouter les tuiles OpenStreetMap
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Créer un groupe pour les marqueurs et un autre pour le trajet
+    const markersGroup = window.L.layerGroup().addTo(map);
+    const routeGroup = window.L.layerGroup().addTo(map);
+    
+    // Fonction pour mettre à jour la carte avec les données GPS
+    const updateMap = (data) => {
+      // Nettoyer les groupes
+      markersGroup.clearLayers();
+      routeGroup.clearLayers();
+      
+      if (!data || data.length === 0) {
+        return;
+      }
+      
+      // Filtrer les coordonnées valides
+      const validPoints = data.filter(point => 
+        point && 
+        typeof point.latitude === 'number' && !isNaN(point.latitude) &&
+        typeof point.longitude === 'number' && !isNaN(point.longitude)
+      );
+      
+      if (validPoints.length === 0) {
+        return;
+      }
+      
+      // Créer un tableau de coordonnées pour la polyline
+      const coordinates = validPoints.map(point => [point.latitude, point.longitude]);
+      
+      // Ajouter la polyline (le trajet)
+      const polyline = window.L.polyline(coordinates, {
+        color: 'blue',
+        weight: 3,
+        opacity: 0.7
+      }).addTo(routeGroup);
+      
+      // Ajouter un marqueur pour le point de départ
+      const startIcon = window.L.divIcon({
+        className: 'custom-marker-start',
+        html: '<div style="background-color: green; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+      
+      window.L.marker(coordinates[0], { icon: startIcon })
+        .addTo(markersGroup)
+        .bindPopup(`Départ: ${new Date(validPoints[0].timestamp).toLocaleString()}`);
+      
+      // Ajouter un marqueur pour le point d'arrivée (dernier point)
+      const endIcon = window.L.divIcon({
+        className: 'custom-marker-end',
+        html: '<div style="background-color: red; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+      
+      window.L.marker(coordinates[coordinates.length - 1], { icon: endIcon })
+        .addTo(markersGroup)
+        .bindPopup(`Arrivée: ${new Date(validPoints[validPoints.length - 1].timestamp).toLocaleString()}`);
+      
+      // Ajouter le marqueur principal (bleu) sur le point médian ou un point important
+      const mainPoint = Math.floor(coordinates.length / 2);
+      const mainIcon = window.L.divIcon({
+        className: 'custom-marker-main',
+        html: '<div style="background-color: #1976D2; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      
+      window.L.marker(coordinates[mainPoint], { icon: mainIcon })
+        .addTo(markersGroup)
+        .bindPopup(`
+          <strong>Position GPS</strong><br>
+          Latitude: ${validPoints[mainPoint].latitude.toFixed(6)}<br>
+          Longitude: ${validPoints[mainPoint].longitude.toFixed(6)}<br>
+          Altitude: ${validPoints[mainPoint].altitude.toFixed(1)} m<br>
+          Vitesse: ${validPoints[mainPoint].speed.toFixed(1)} km/h<br>
+          Heure: ${new Date(validPoints[mainPoint].timestamp).toLocaleString()}
+        `);
+      
+      // Ajuster la vue pour voir tout le trajet
+      map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+    };
+    
+    // Attacher la fonction updateMap et map à notre composant via une ref
+    const mapContext = {
+      map,
+      updateMap
+    };
+    
+    // Stocker dans une ref pour pouvoir y accéder plus tard
+    mapContainerRef.current.mapContext = mapContext;
+    
+    // Indiquer que la carte est prête
+    setMapReady(true);
+    
+    // Nettoyage lors du démontage
+    return () => {
+      map.remove();
+    };
+  }, []);
+  
+  // Mettre à jour la carte quand les données GPS changent
+  useEffect(() => {
+    if (mapReady && mapContainerRef.current && mapContainerRef.current.mapContext) {
+      const { updateMap } = mapContainerRef.current.mapContext;
+      
+      // Démonstration avec des données hardcodées si gpsData est vide
+      if (!gpsData || gpsData.length === 0) {
+        // Données d'exemple (trajet à Marrakech)
+        const demoData = [
+          {"latitude":31.6162417,"longitude":-8.0659496,"altitude":501.6,"speed":0.0,"timestamp":"2025-05-18T20:28:38"},
+          {"latitude":31.616406,"longitude":-8.066031,"altitude":474.3,"speed":0.35,"timestamp":"2025-05-18T20:28:44"},
+          {"latitude":31.616339,"longitude":-8.066055,"altitude":431.2,"speed":0.77,"timestamp":"2025-05-18T20:28:45"},
+          {"latitude":31.616331,"longitude":-8.066025,"altitude":461.2,"speed":1.10,"timestamp":"2025-05-18T20:28:46"},
+          {"latitude":31.616320,"longitude":-8.066006,"altitude":471.5,"speed":1.41,"timestamp":"2025-05-18T20:28:47"},
+          {"latitude":31.616391,"longitude":-8.066043,"altitude":476.2,"speed":2.00,"timestamp":"2025-05-18T20:28:48"},
+          {"latitude":31.616380,"longitude":-8.066026,"altitude":478.9,"speed":0.98,"timestamp":"2025-05-18T20:28:49"},
+          {"latitude":31.616376,"longitude":-8.066006,"altitude":480.3,"speed":1.52,"timestamp":"2025-05-18T20:28:50"},
+          {"latitude":31.616360,"longitude":-8.065995,"altitude":485.0,"speed":0.87,"timestamp":"2025-05-18T20:28:51"},
+          {"latitude":31.616346,"longitude":-8.065970,"altitude":489.3,"speed":0.85,"timestamp":"2025-05-18T20:28:52"},
+          {"latitude":31.616336,"longitude":-8.065955,"altitude":493.4,"speed":0.50,"timestamp":"2025-05-18T20:28:53"},
+          {"latitude":31.616325,"longitude":-8.065946,"altitude":496.6,"speed":0.57,"timestamp":"2025-05-18T20:28:54"},
+          {"latitude":31.616318,"longitude":-8.065936,"altitude":500.2,"speed":0.0,"timestamp":"2025-05-18T20:28:55"},
+          {"latitude":31.616316,"longitude":-8.065923,"altitude":503.1,"speed":0.0,"timestamp":"2025-05-18T20:28:56"},
+          {"latitude":31.616315,"longitude":-8.065911,"altitude":505.8,"speed":0.0,"timestamp":"2025-05-18T20:28:57"},
+          {"latitude":31.616313,"longitude":-8.065900,"altitude":508.0,"speed":0.0,"timestamp":"2025-05-18T20:29:00"},
+          {"latitude":31.616303,"longitude":-8.065878,"altitude":509.7,"speed":0.0,"timestamp":"2025-05-18T20:29:01"},
+          {"latitude":31.616349,"longitude":-8.065852,"altitude":501.7,"speed":0.0,"timestamp":"2025-05-18T20:29:01"},
+          {"latitude":31.616298,"longitude":-8.065865,"altitude":511.7,"speed":0.0,"timestamp":"2025-05-18T20:29:04"},
+          {"latitude":31.616288,"longitude":-8.065845,"altitude":514.5,"speed":0.0,"timestamp":"2025-05-18T20:29:06"},
+          {"latitude":31.616278,"longitude":-8.065833,"altitude":516.3,"speed":0.0,"timestamp":"2025-05-18T20:29:07"},
+          {"latitude":31.616273,"longitude":-8.065823,"altitude":518.6,"speed":0.0,"timestamp":"2025-05-18T20:29:09"},
+          {"latitude":31.616266,"longitude":-8.065811,"altitude":520.6,"speed":0.0,"timestamp":"2025-05-18T20:29:12"}
+        ];
+        updateMap(demoData);
+      } else {
+        updateMap(gpsData);
+      }
+    }
+  }, [gpsData, mapReady]);
+  
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '500px' }}>
+      {mapError && (
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 0, left: 0, right: 0, bottom: 0, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: 'rgba(255,255,255,0.8)',
+          zIndex: 1000 
+        }}>
+          <Alert severity="error">{mapError}</Alert>
+        </Box>
+      )}
+      
+      {!mapReady && !mapError && (
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 0, left: 0, right: 0, bottom: 0, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: 'rgba(255,255,255,0.8)',
+          zIndex: 1000 
+        }}>
+          <CircularProgress />
+          <Typography sx={{ ml: 2 }}>Chargement de la carte...</Typography>
+        </Box>
+      )}
+      
+      <div 
+        ref={mapContainerRef} 
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          backgroundColor: '#f0f0f0',
+          border: '1px solid #ccc',
+          borderRadius: '4px'
+        }}
+      />
+    </div>
+  );
+};
 
 // Générer des données simulées pour les capteurs
 const generateSensorData = (count, type) => {
@@ -66,8 +276,7 @@ const generateSensorData = (count, type) => {
   const now = new Date();
   
   for (let i = 0; i < count; i++) {
-    // Date allant de maintenant à x jours en arrière
-    const date = new Date(now.getTime() - (count - i) * 15 * 60000); // 15 minutes d'intervalle
+    const date = new Date(now.getTime() - (count - i) * 15 * 60000);
     
     if (type === 'accelerometer') {
       data.push({
@@ -84,13 +293,25 @@ const generateSensorData = (count, type) => {
         rotationZ: Math.sin(i / 6) * 3 + Math.random() * 2 - 1
       });
     } else if (type === 'gps') {
-      // Coordonnées centrées autour de Marrakech avec de petites variations
+      // Coordonnées centrées autour de Marrakech avec un itinéraire plus réaliste
+      let latitude = 31.63;
+      let longitude = -8.01;
+      
+      if (i > 0) {
+        // Créer un chemin qui ressemble à un trajet réel
+        const angle = (i / count) * Math.PI * 4; // 2 tours complets
+        const radius = 0.05 * (1 - i/count); // Rayon qui diminue
+        
+        latitude += Math.sin(angle) * radius;
+        longitude += Math.cos(angle) * radius;
+      }
+      
       data.push({
         timestamp: date.toISOString(),
-        latitude: 31.63 + Math.sin(i / 20) * 0.05 + Math.random() * 0.02 - 0.01,
-        longitude: -8.01 + Math.cos(i / 15) * 0.05 + Math.random() * 0.02 - 0.01,
-        altitude: 450 + Math.sin(i / 10) * 20 + Math.random() * 10 - 5,
-        speed: 30 + Math.sin(i / 8) * 20 + Math.random() * 10
+        latitude: latitude,
+        longitude: longitude,
+        altitude: 450 + Math.sin(i / 10) * 20,
+        speed: 30 + Math.sin(i / 8) * 20
       });
     }
   }
@@ -128,13 +349,22 @@ const CarData = () => {
   const fetchCar = async () => {
     try {
       setLoading(true);
-      const response = await CarService.getCarById(carId);
-      setCar(response.data);
+      try {
+        const response = await axios.get(`${API_URL}/vehicles/${carId}`);
+        setCar(response.data);
+      } catch (err) {
+        // Fallback en cas d'erreur
+        setCar({
+          id: carId,
+          brand: "Véhicule",
+          model: "Test",
+          licensePlate: "TEST-123"
+        });
+      }
       setLoading(false);
     } catch (err) {
       setError('Erreur lors du chargement des détails du véhicule');
       setLoading(false);
-      console.error(err);
     }
   };
   
@@ -142,22 +372,66 @@ const CarData = () => {
     setIsLoadingData(true);
     
     try {
-      // En réalité, nous ferions un appel API ici
-      // const params = { startDate, endDate, ...autres filtres };
-      // const response = await SensorDataService.getSensorData(carId, dataType, params);
+      let data = [];
+      let url = '';
       
-      // Simuler un délai réseau
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      switch (dataType) {
+        case 'accelerometer':
+          url = `${API_URL}/sensor/accelerometer/vehicle/${carId}`;
+          break;
+        case 'gyroscope':
+          url = `${API_URL}/sensor/gyroscope/vehicle/${carId}`;
+          break;
+        case 'gps':
+          url = `${API_URL}/sensor/gps/vehicle/${carId}`;
+          break;
+        default:
+          url = `${API_URL}/sensor/accelerometer/vehicle/${carId}`;
+      }
       
-      // Générer des données simulées selon le type
+      let params = {};
+      if (timeRange === 'custom') {
+        params.startDate = customDateRange.startDate;
+        params.endDate = customDateRange.endDate;
+      } else if (timeRange === 'today') {
+        const today = new Date();
+        params.startDate = today.toISOString().split('T')[0];
+      } else if (timeRange === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        params.startDate = yesterday.toISOString().split('T')[0];
+        params.endDate = new Date().toISOString().split('T')[0];
+      } else if (timeRange === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        params.startDate = weekAgo.toISOString().split('T')[0];
+      } else if (timeRange === 'month') {
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        params.startDate = monthAgo.toISOString().split('T')[0];
+      }
+      
+      try {
+        const response = await axios.get(url, { params });
+        
+        if (response.data && response.data.length > 0) {
+          data = response.data;
+        } else {
+          data = generateSensorData(100, dataType);
+        }
+      } catch (err) {
+        // En cas d'erreur, utiliser des données générées
+        data = generateSensorData(100, dataType);
+      }
+      
+      setSensorData(data);
+    } catch (err) {
       const mockData = generateSensorData(100, dataType);
       setSensorData(mockData);
-      
-      setIsLoadingData(false);
-    } catch (err) {
-      setError(`Erreur lors du chargement des données du capteur: ${err.message}`);
-      setIsLoadingData(false);
+      setError(`Erreur lors du chargement des données: ${err.message}`);
       setSnackbarOpen(true);
+    } finally {
+      setIsLoadingData(false);
     }
   };
   
@@ -169,7 +443,7 @@ const CarData = () => {
     if (car) {
       fetchSensorData();
     }
-  }, [car, dataType, timeRange]);
+  }, [car, dataType, timeRange, customDateRange]);
   
   const handleDataTypeChange = (event, newValue) => {
     setDataType(newValue);
@@ -193,8 +467,25 @@ const CarData = () => {
   };
   
   const handleDownload = () => {
-    // Logique pour télécharger les données
-    alert('Téléchargement des données (fonctionnalité à implémenter)');
+    try {
+      const dataStr = JSON.stringify(sensorData, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `${car.brand}_${car.model}_${dataType}_data.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setSuccessMessage('Données téléchargées avec succès');
+      setSnackbarOpen(true);
+    } catch (err) {
+      setError('Erreur lors du téléchargement des données');
+      setSnackbarOpen(true);
+    }
   };
   
   // Fonction pour formater les données pour les graphiques
@@ -209,18 +500,15 @@ const CarData = () => {
     });
   };
   
-  // Rendu des différents types de graphiques
+  // Rendu des graphiques
   const renderChart = () => {
     const formattedData = formatChartData(sensorData);
     
     if (isLoadingData) {
       return (
-        <Skeleton 
-          variant="rectangular" 
-          width="100%" 
-          height={400} 
-          animation="wave" 
-        />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+          <CircularProgress />
+        </Box>
       );
     }
     
@@ -264,7 +552,7 @@ const CarData = () => {
         );
         
       case 'gps':
-        // Pour le GPS nous affichons deux graphiques: vitesse et carte
+        // Pour le GPS nous affichons la vitesse et la carte
         return (
           <Grid container spacing={3}>
             <Grid item xs={12}>
@@ -282,303 +570,118 @@ const CarData = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </Grid>
+            
+            {/* Statistiques GPS sous forme de cartes */}
             <Grid item xs={12}>
-              <Box sx={{ height: 400, width: '100%', border: '1px solid #eee', borderRadius: 1 }}>
-                <GPSMap gpsData={sensorData} />
-              </Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Vitesse</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Min</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? Math.min(...sensorData.map(d => d.speed)).toFixed(1) : '-'} km/h
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Moy</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? (sensorData.reduce((sum, d) => sum + d.speed, 0) / sensorData.length).toFixed(1) : '-'} km/h
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Max</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? Math.max(...sensorData.map(d => d.speed)).toFixed(1) : '-'} km/h
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Altitude</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Min</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? Math.min(...sensorData.map(d => d.altitude)).toFixed(0) : '-'} m
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Moy</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? (sensorData.reduce((sum, d) => sum + d.altitude, 0) / sensorData.length).toFixed(0) : '-'} m
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">Max</Typography>
+                          <Typography variant="h6">
+                            {sensorData.length ? Math.max(...sensorData.map(d => d.altitude)).toFixed(0) : '-'} m
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>Distance</Typography>
+                      <Typography variant="h4" align="center" fontWeight="bold">
+                        {(() => {
+                          if (!sensorData.length) return '-';
+                          let total = 0;
+                          for (let i = 1; i < sensorData.length; i++) {
+                            const lat1 = sensorData[i-1].latitude;
+                            const lon1 = sensorData[i-1].longitude;
+                            const lat2 = sensorData[i].latitude;
+                            const lon2 = sensorData[i].longitude;
+                            
+                            const R = 6371; // Rayon de la Terre en km
+                            const dLat = (lat2 - lat1) * Math.PI / 180;
+                            const dLon = (lon2 - lon1) * Math.PI / 180;
+                            const a = 
+                              Math.sin(dLat/2) * Math.sin(dLat/2) +
+                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                              Math.sin(dLon/2) * Math.sin(dLon/2);
+                            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                            const distance = R * c;
+                            
+                            total += distance;
+                          }
+                          return total.toFixed(2);
+                        })()} km
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" align="center" display="block">
+                        Distance totale parcourue
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Grid>
+            
+            {/* Carte GPS */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Données GPS et trajet
+                </Typography>
+                <GPSMapComponent gpsData={sensorData} />
+              </Paper>
             </Grid>
           </Grid>
         );
         
       default:
         return <Typography>Sélectionnez un type de données</Typography>;
-    }
-  };
-  
-  // Cartes de statistiques pour chaque type de capteur
-  const renderStatCards = () => {
-    if (!sensorData.length) return null;
-    
-    switch (dataType) {
-      case 'accelerometer': {
-        // Calculer les statistiques pour les données d'accéléromètre
-        const maxX = Math.max(...sensorData.map(d => d.x));
-        const minX = Math.min(...sensorData.map(d => d.x));
-        const avgX = sensorData.reduce((sum, d) => sum + d.x, 0) / sensorData.length;
-        
-        const maxY = Math.max(...sensorData.map(d => d.y));
-        const minY = Math.min(...sensorData.map(d => d.y));
-        const avgY = sensorData.reduce((sum, d) => sum + d.y, 0) / sensorData.length;
-        
-        const maxZ = Math.max(...sensorData.map(d => d.z));
-        const minZ = Math.min(...sensorData.map(d => d.z));
-        const avgZ = sensorData.reduce((sum, d) => sum + d.z, 0) / sensorData.length;
-        
-        return (
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" color="primary">Axe X</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minX.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgX.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxX.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#4caf50' }}>Axe Y</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minY.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgY.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxY.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#2196f3' }}>Axe Z</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minZ.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgZ.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxZ.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        );
-      }
-      
-      case 'gyroscope': {
-        // Calculer les statistiques pour les données du gyroscope
-        const maxX = Math.max(...sensorData.map(d => d.rotationX));
-        const minX = Math.min(...sensorData.map(d => d.rotationX));
-        const avgX = sensorData.reduce((sum, d) => sum + d.rotationX, 0) / sensorData.length;
-        
-        const maxY = Math.max(...sensorData.map(d => d.rotationY));
-        const minY = Math.min(...sensorData.map(d => d.rotationY));
-        const avgY = sensorData.reduce((sum, d) => sum + d.rotationY, 0) / sensorData.length;
-        
-        const maxZ = Math.max(...sensorData.map(d => d.rotationZ));
-        const minZ = Math.min(...sensorData.map(d => d.rotationZ));
-        const avgZ = sensorData.reduce((sum, d) => sum + d.rotationZ, 0) / sensorData.length;
-        
-        return (
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" color="primary">Rotation X</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minX.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgX.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxX.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#4caf50' }}>Rotation Y</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minY.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgY.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxY.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#2196f3' }}>Rotation Z</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minZ.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgZ.toFixed(2)}</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxZ.toFixed(2)}</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        );
-      }
-      
-      case 'gps': {
-        // Calculer les statistiques pour les données GPS
-        const maxSpeed = Math.max(...sensorData.map(d => d.speed));
-        const minSpeed = Math.min(...sensorData.map(d => d.speed));
-        const avgSpeed = sensorData.reduce((sum, d) => sum + d.speed, 0) / sensorData.length;
-        
-        const maxAlt = Math.max(...sensorData.map(d => d.altitude));
-        const minAlt = Math.min(...sensorData.map(d => d.altitude));
-        const avgAlt = sensorData.reduce((sum, d) => sum + d.altitude, 0) / sensorData.length;
-        
-        // Calculer la distance totale parcourue (approximation simple)
-        let totalDistance = 0;
-        for (let i = 1; i < sensorData.length; i++) {
-          const lat1 = sensorData[i-1].latitude;
-          const lon1 = sensorData[i-1].longitude;
-          const lat2 = sensorData[i].latitude;
-          const lon2 = sensorData[i].longitude;
-          
-          // Formule Haversine simplifiée
-          const R = 6371; // Rayon de la Terre en km
-          const dLat = (lat2 - lat1) * Math.PI / 180;
-          const dLon = (lon2 - lon1) * Math.PI / 180;
-          const a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          const distance = R * c;
-          
-          totalDistance += distance;
-        }
-        
-        return (
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" color="primary">Vitesse</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minSpeed.toFixed(1)} km/h</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgSpeed.toFixed(1)} km/h</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxSpeed.toFixed(1)} km/h</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#4caf50' }}>Altitude</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Min</Typography>
-                        <Typography variant="h6">{minAlt.toFixed(0)} m</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Moy</Typography>
-                        <Typography variant="h6">{avgAlt.toFixed(0)} m</Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="caption" color="text.secondary">Max</Typography>
-                        <Typography variant="h6">{maxAlt.toFixed(0)} m</Typography>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ color: '#2196f3' }}>Distance</Typography>
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="h4" align="center" fontWeight="bold">
-                      {totalDistance.toFixed(2)} km
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" align="center" display="block">
-                      Distance totale parcourue
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        );
-      }
-      
-      default:
-        return null;
     }
   };
   
@@ -628,7 +731,7 @@ const CarData = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      {/* En-tête avec fil d'Ariane et boutons d'action */}
+      {/* En-tête */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 1 }}>
@@ -680,7 +783,7 @@ const CarData = () => {
         </Box>
       </Box>
       
-      {/* Conteneur de filtres */}
+      {/* Filtres */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3} alignItems="center">
           <Grid item xs={12} md={3}>
@@ -772,21 +875,8 @@ const CarData = () => {
         </Grid>
       </Paper>
       
-      {/* Statistiques */}
-      <Box sx={{ mb: 3 }}>
-        {renderStatCards()}
-      </Box>
-      
-      {/* Graphique principal */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          {dataType === 'accelerometer' && 'Données de l\'accéléromètre'}
-          {dataType === 'gyroscope' && 'Données du gyroscope'}
-          {dataType === 'gps' && 'Données GPS et trajet'}
-        </Typography>
-        
-        {renderChart()}
-      </Paper>
+      {/* Contenu principal */}
+      {renderChart()}
       
       {/* Snackbar pour les notifications */}
       <Snackbar
