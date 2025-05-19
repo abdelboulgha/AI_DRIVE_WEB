@@ -211,4 +211,75 @@ public class VehicleController {
 
         return ResponseEntity.ok(constants);
     }
+
+//yahafid ya star
+    @DeleteMapping("/delete-unsecured/{id}")
+    public ResponseEntity<?> deleteVehicleUnsecured(@PathVariable Long id) {
+        try {
+            // Récupérer le véhicule
+            Vehicle vehicle = vehicleService.getVehicleById(id);
+            if (vehicle == null) {
+                return new ResponseEntity<>("Véhicule introuvable", HttpStatus.NOT_FOUND);
+            }
+
+            // Supprimer le véhicule sans vérification d'authentification
+            vehicleService.deleteVehicle(id);
+
+            return new ResponseEntity<>("Véhicule supprimé avec succès", HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Erreur lors de la suppression: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    //yarbii
+    @PutMapping("/update-unsecured/{id}")
+    public ResponseEntity<Vehicle> updateVehicleUnsecured(
+            @PathVariable Long id,
+            @RequestBody Vehicle vehicleDetails) {
+        try {
+            // Récupérer le véhicule existant
+            Vehicle existingVehicle = vehicleService.getVehicleById(id);
+            if (existingVehicle == null) {
+                return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+            }
+
+            // Mettre à jour le véhicule sans vérification d'authentification
+            if (vehicleDetails.getBrand() != null) {
+                existingVehicle.setBrand(vehicleDetails.getBrand());
+            }
+            if (vehicleDetails.getModel() != null) {
+                existingVehicle.setModel(vehicleDetails.getModel());
+            }
+            if (vehicleDetails.getColor() != null) {
+                existingVehicle.setColor(vehicleDetails.getColor());
+            }
+            if (vehicleDetails.getYear() != null) {
+                existingVehicle.setYear(vehicleDetails.getYear());
+            }
+            if (vehicleDetails.getMileage() != null) {
+                existingVehicle.setMileage(vehicleDetails.getMileage());
+            }
+            if (vehicleDetails.getFuelType() != null) {
+                existingVehicle.setFuelType(vehicleDetails.getFuelType());
+            }
+            if (vehicleDetails.getSafetyScore() != null) {
+                existingVehicle.setSafetyScore(vehicleDetails.getSafetyScore());
+            }
+            if (vehicleDetails.getStatus() != null) {
+                existingVehicle.setStatus(vehicleDetails.getStatus());
+            }
+
+            // Mettre à jour la date de dernière activité
+            existingVehicle.updateActivity();
+
+            // Sauvegarder les modifications
+            Vehicle updatedVehicle = vehicleRepository.save(existingVehicle);
+
+            return new ResponseEntity<>(updatedVehicle, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(null,
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

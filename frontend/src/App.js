@@ -121,7 +121,11 @@ function App() {
   
   {/* Routes protégées */}
   <Route path="/" element={<Layout />}>
-    <Route index element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+    {/* Redirection de la page d'accueil vers /cars */}
+    <Route index element={<Navigate to="/cars" replace />} />
+    
+    {/* Dashboard accessible via son propre chemin */}
+    <Route path="dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
     
     {/* Routes de données capteurs */}
     <Route path="accelerometer" element={<PrivateRoute><AccelerometerData /></PrivateRoute>} />

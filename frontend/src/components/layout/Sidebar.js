@@ -37,9 +37,7 @@ const drawerWidth = 240;
 
 // Menu de surveillance des capteurs
 const sensorMenuItems = [
-  { text: 'Accéléromètre', icon: <SpeedIcon />, path: '/accelerometer' },
   { text: 'GPS', icon: <LocationOnIcon />, path: '/gps' },
-  { text: 'Gyroscope', icon: <ThreeSixtyIcon />, path: '/gyroscope' },
 ];
 
 // Menu administrateur

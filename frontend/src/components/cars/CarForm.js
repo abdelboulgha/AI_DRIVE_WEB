@@ -12,622 +12,449 @@ import {
   Select,
   MenuItem,
   FormHelperText,
-  Switch,
-  FormControlLabel,
+  CircularProgress,
+  Alert,
   Typography,
   Box,
-  Divider,
-  IconButton,
-  CircularProgress,
-  Autocomplete
+  Divider
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import CarService from '../../api/carService';
-import UserService from '../../api/userService';
+import axios from 'axios';
 
-const CarForm = ({ open, handleClose, car, userId, onSave }) => {
-  const isEditMode = !!car;
+const API_URL = 'http://localhost:8080/api';
+
+const CarForm = ({ open, handleClose, car, userId, onSave, unsecuredEdit = false }) => {
+  const isEditing = !!car;
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [colors, setColors] = useState([]);
+  const [fuelTypes, setFuelTypes] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
   
   const [formData, setFormData] = useState({
     brand: '',
     model: '',
-    year: new Date().getFullYear(),
     licensePlate: '',
     color: '',
-    userId: userId || '',
-    status: 'ACTIVE',
-    fuelType: 'Essence',
+    year: new Date().getFullYear(),
     mileage: 0,
-    deviceId: '',
-    vin: ''
+    fuelType: 'Essence',
+    safetyScore: 80,
+    status: 'ACTIF'
   });
   
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   
-  const carColors = [
-    'Blanc', 'Noir', 'Gris', 'Bleu', 'Rouge', 'Vert', 'Jaune', 'Orange', 
-    'Marron', 'Beige', 'Violet', 'Rose', 'Doré', 'Argenté'
-  ];
+  // Chargement des constantes (couleurs, types de carburant, etc.)
+  useEffect(() => {
+    const fetchConstants = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/vehicles/constants`);
+        setColors(response.data.vehicleColors || []);
+        setFuelTypes(response.data.fuelTypes || []);
+        setStatusOptions(response.data.statusOptions || []);
+      } catch (err) {
+        console.error('Erreur lors du chargement des constantes:', err);
+        setColors([
+          { name: 'Rouge', hexCode: '#f44336' },
+          { name: 'Bleu', hexCode: '#2196f3' },
+          { name: 'Vert', hexCode: '#4caf50' },
+          { name: 'Jaune', hexCode: '#ffeb3b' },
+          { name: 'Noir', hexCode: '#212121' },
+          { name: 'Blanc', hexCode: '#f5f5f5' },
+          { name: 'Gris', hexCode: '#9e9e9e' }
+        ]);
+        setFuelTypes([
+          { id: 1, name: 'Essence', color: '#f44336' },
+          { id: 2, name: 'Diesel', color: '#ff9800' },
+          { id: 3, name: 'Hybride', color: '#4caf50' },
+          { id: 4, name: 'Électrique', color: '#2196f3' }
+        ]);
+        setStatusOptions([
+          { value: 'ACTIF', label: 'Actif', color: 'success' },
+          { value: 'INACTIF', label: 'Inactif', color: 'default' }
+        ]);
+      }
+    };
+    
+    fetchConstants();
+  }, []);
   
-  const carBrands = [
-    'Audi', 'BMW', 'Citroën', 'Dacia', 'Fiat', 'Ford', 'Honda', 'Hyundai',
-    'Kia', 'Mercedes', 'Nissan', 'Opel', 'Peugeot', 'Renault', 'Seat',
-    'Skoda', 'Toyota', 'Volkswagen', 'Volvo'
-  ];
-  
-  const fuelTypes = [
-    'Essence', 'Diesel', 'Hybride', 'Électrique', 'GPL', 'GNV'
-  ];
-  
+  // Initialisation du formulaire avec les données du véhicule si en mode édition
   useEffect(() => {
     if (car) {
       setFormData({
         brand: car.brand || '',
         model: car.model || '',
-        year: car.year || new Date().getFullYear(),
         licensePlate: car.licensePlate || '',
         color: car.color || '',
-        userId: car.userId || userId || '',
-        status: car.status || 'ACTIVE',
-        fuelType: car.fuelType || 'Essence',
+        year: car.year || new Date().getFullYear(),
         mileage: car.mileage || 0,
-        deviceId: car.deviceId || '',
-        vin: car.vin || ''
+        fuelType: car.fuelType || 'Essence',
+        safetyScore: car.safetyScore || 80,
+        status: car.status || 'ACTIF'
       });
-      
-      if (car.userId) {
-        setSelectedUser({
-          id: car.userId,
-          fullName: `${car.owner?.firstName || ''} ${car.owner?.lastName || ''}`
-        });
-      }
     } else {
-      // Réinitialiser le formulaire pour une nouvelle voiture
+      // Réinitialiser le formulaire en mode création
       setFormData({
         brand: '',
         model: '',
-        year: new Date().getFullYear(),
         licensePlate: '',
         color: '',
-        userId: userId || '',
-        status: 'ACTIVE',
-        fuelType: 'Essence',
+        year: new Date().getFullYear(),
         mileage: 0,
-        deviceId: '',
-        vin: ''
+        fuelType: 'Essence',
+        safetyScore: 80,
+        status: 'ACTIF'
       });
-      
-      setSelectedUser(null);
     }
     
-    setErrors({});
-    
-    // Si aucun userId n'est fourni, charger la liste des utilisateurs
-    if (!userId) {
-      fetchUsers();
-    }
-  }, [car, userId, open]);
+    // Réinitialiser les erreurs
+    setFormErrors({});
+    setError(null);
+  }, [car, open]);
   
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await UserService.getAllUsers({ limit: 100 });
-      
-      // Transformer les données pour l'autocomplete
-      const formattedUsers = response.data.map(user => ({
-        id: user.id,
-        fullName: `${user.firstName} ${user.lastName}`,
-        email: user.email
-      }));
-      
-      setUsers(formattedUsers);
-      setLoadingUsers(false);
-    } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
-      setLoadingUsers(false);
-    }
-  };
-  
-  const handleChange = (e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    setFormData({
+      ...formData,
       [name]: value
-    }));
+    });
     
-    // Effacer l'erreur pour ce champ si elle existe
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+    // Effacer l'erreur si le champ est rempli
+    if (formErrors[name]) {
+      setFormErrors({
+        ...formErrors,
+        [name]: null
+      });
     }
   };
-  
-  const handleNumberChange = (e) => {
-    const { name, value } = e.target;
-    const numValue = value === '' ? '' : parseInt(value, 10);
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: numValue
-    }));
-    
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-  
-  const handleSwitchChange = (e) => {
-    const { name, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked ? 'ACTIVE' : 'INACTIVE'
-    }));
-  };
-  
-  const handleUserChange = (event, newValue) => {
-    setSelectedUser(newValue);
-    
-    if (newValue) {
-      setFormData(prev => ({
-        ...prev,
-        userId: newValue.id
-      }));
-      
-      if (errors.userId) {
-        setErrors(prev => ({
-          ...prev,
-          userId: ''
-        }));
-      }
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        userId: ''
-      }));
-    }
-  };
-  
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 31 }, (_, i) => currentYear - i);
   
   const validateForm = () => {
-    const newErrors = {};
+    const errors = {};
     
-    // Valider la marque
     if (!formData.brand.trim()) {
-      newErrors.brand = 'La marque est requise';
+      errors.brand = 'La marque est requise';
     }
     
-    // Valider le modèle
     if (!formData.model.trim()) {
-      newErrors.model = 'Le modèle est requis';
+      errors.model = 'Le modèle est requis';
     }
     
-    // Valider l'année
-    if (!formData.year) {
-      newErrors.year = 'L\'année est requise';
-    } else if (formData.year < 1900 || formData.year > currentYear) {
-      newErrors.year = `L'année doit être comprise entre 1900 et ${currentYear}`;
-    }
-    
-    // Valider la plaque d'immatriculation
     if (!formData.licensePlate.trim()) {
-      newErrors.licensePlate = 'La plaque d\'immatriculation est requise';
+      errors.licensePlate = "La plaque d'immatriculation est requise";
+    } else if (!/^[A-Z0-9-]{2,10}$/i.test(formData.licensePlate.trim())) {
+      errors.licensePlate = "Format de plaque d'immatriculation invalide";
     }
     
-    // Valider la couleur
-    if (!formData.color.trim()) {
-      newErrors.color = 'La couleur est requise';
+    if (!formData.color) {
+      errors.color = 'La couleur est requise';
     }
     
-    // Valider l'utilisateur
-    if (!formData.userId) {
-      newErrors.userId = 'Le propriétaire est requis';
+    if (!formData.year) {
+      errors.year = "L'année est requise";
+    } else if (formData.year < 1900 || formData.year > new Date().getFullYear() + 1) {
+      errors.year = 'Année invalide';
     }
     
-    // Valider le kilométrage
-    if (formData.mileage === '') {
-      newErrors.mileage = 'Le kilométrage est requis';
-    } else if (isNaN(formData.mileage) || formData.mileage < 0) {
-      newErrors.mileage = 'Le kilométrage doit être un nombre positif';
+    if (formData.mileage < 0) {
+      errors.mileage = 'Le kilométrage ne peut pas être négatif';
     }
     
-    // Valider l'ID de l'appareil
-    if (formData.deviceId && !/^[A-Za-z0-9-]+$/.test(formData.deviceId)) {
-      newErrors.deviceId = 'Format d\'ID de l\'appareil invalide';
+    if (!formData.fuelType) {
+      errors.fuelType = 'Le type de carburant est requis';
     }
     
-    // Valider le VIN
-    if (formData.vin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(formData.vin)) {
-      newErrors.vin = 'Le VIN doit comporter exactement 17 caractères alphanumériques (sans I, O ou Q)';
+    if (formData.safetyScore < 0 || formData.safetyScore > 100) {
+      errors.safetyScore = 'Le score de sécurité doit être entre 0 et 100';
     }
     
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
   
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    // Valider le formulaire
+    if (!validateForm()) {
+      return;
+    }
     
     setLoading(true);
+    setError(null);
     
     try {
-      const carData = { ...formData };
+      // Préparer les données
+      const carData = {
+        ...formData,
+        mileage: parseInt(formData.mileage, 10),
+        year: parseInt(formData.year, 10),
+        safetyScore: parseInt(formData.safetyScore, 10)
+      };
       
-      if (isEditMode) {
-        await CarService.updateCar(car.id, carData);
-      } else {
-        await CarService.createCar(carData);
+      console.log('Données envoyées au serveur:', carData);
+      
+      // Si un utilisateur spécifique est fourni, ajouter son ID
+      if (userId) {
+        carData.userId = userId;
       }
       
-      onSave();
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
-      const serverErrors = error.response?.data?.errors;
-      
-      if (serverErrors) {
-        setErrors(prev => ({
-          ...prev,
-          ...serverErrors,
-          serverError: error.response?.data?.message || 'Une erreur est survenue'
-        }));
+      // Effectuer l'appel API
+      if (isEditing) {
+        // Log pour debug
+        console.log(`Mise à jour du véhicule ${car.id} - Mode ${unsecuredEdit ? 'sans sécurité' : 'sécurisé'}`);
+        
+        if (unsecuredEdit) {
+          // Appel sans sécurité
+          await axios.put(`${API_URL}/vehicles/update-unsecured/${car.id}`, carData);
+        } else {
+          // Appel normal
+          await axios.put(`${API_URL}/vehicles/${car.id}`, carData);
+        }
       } else {
-        setErrors(prev => ({
-          ...prev,
-          serverError: 'Une erreur est survenue lors de la communication avec le serveur'
-        }));
+        // Création d'un nouveau véhicule
+        console.log('Création d\'un nouveau véhicule');
+        
+        // Utiliser l'endpoint sans sécurité pour la création
+        await axios.post(`${API_URL}/vehicles/vehicles/create`, carData);
+        //http://localhost:8080/api/vehicles/vehicles/create
+      }
+      
+      // Callback de succès
+      if (onSave) {
+        onSave(carData);
+      } else {
+        handleClose();
+      }
+    } catch (err) {
+      console.error('Erreur lors de la création/modification du véhicule:', err);
+      
+      // Afficher un message d'erreur détaillé
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(`Erreur: ${err.response.data.message}`);
+      } else {
+        setError(`Erreur lors de ${isEditing ? 'la modification' : 'la création'} du véhicule: ${err.message}`);
       }
     } finally {
       setLoading(false);
     }
   };
   
-  const getColorBox = (color) => {
-    const colorMap = {
-      'Rouge': '#f44336',
-      'Bleu': '#2196f3',
-      'Vert': '#4caf50',
-      'Jaune': '#ffeb3b',
-      'Noir': '#212121',
-      'Blanc': '#f5f5f5',
-      'Gris': '#9e9e9e',
-      'Orange': '#ff9800',
-      'Marron': '#795548',
-      'Beige': '#e0e0d1',
-      'Violet': '#9c27b0',
-      'Rose': '#e91e63',
-      'Doré': '#ffd700',
-      'Argenté': '#c0c0c0'
-    };
-    
-    const bgColor = colorMap[color] || '#9e9e9e';
-    
-    return (
-      <Box
-        sx={{
-          width: 16,
-          height: 16,
-          bgcolor: bgColor,
-          borderRadius: '50%',
-          display: 'inline-block',
-          border: '1px solid #ddd',
-          mr: 1,
-          verticalAlign: 'middle'
-        }}
-      />
-    );
-  };
-  
   return (
     <Dialog 
       open={open} 
-      onClose={loading ? null : handleClose}
-      fullWidth
+      onClose={handleClose}
       maxWidth="md"
+      fullWidth
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">
-          {isEditMode ? 'Modifier le véhicule' : 'Ajouter un nouveau véhicule'}
-        </Typography>
-        <IconButton onClick={handleClose} disabled={loading}>
-          <CloseIcon />
-        </IconButton>
+      <DialogTitle>
+        {isEditing 
+          ? `Modifier le véhicule ${car?.brand} ${car?.model}`
+          : 'Ajouter un nouveau véhicule'
+        }
       </DialogTitle>
       
       <DialogContent dividers>
-        {errors.serverError && (
-          <Typography color="error" sx={{ mb: 2 }}>
-            {errors.serverError}
-          </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
         )}
         
-        <Grid container spacing={3}>
-          {/* Informations de base */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Informations du véhicule
-            </Typography>
-          </Grid>
-          
+        <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
-            <Autocomplete
-              options={carBrands}
-              freeSolo
+            <TextField
+              required
+              fullWidth
+              label="Marque"
+              name="brand"
               value={formData.brand}
-              onChange={(event, newValue) => {
-                setFormData(prev => ({
-                  ...prev,
-                  brand: newValue || ''
-                }));
-                if (errors.brand) {
-                  setErrors(prev => ({
-                    ...prev,
-                    brand: ''
-                  }));
-                }
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  name="brand"
-                  label="Marque"
-                  error={!!errors.brand}
-                  helperText={errors.brand}
-                  required
-                  disabled={loading}
-                />
-              )}
+              onChange={handleInputChange}
+              error={!!formErrors.brand}
+              helperText={formErrors.brand}
+              margin="normal"
             />
           </Grid>
           
           <Grid item xs={12} sm={6}>
             <TextField
-              name="model"
+              required
+              fullWidth
               label="Modèle"
-              fullWidth
+              name="model"
               value={formData.model}
-              onChange={handleChange}
-              error={!!errors.model}
-              helperText={errors.model}
-              required
-              disabled={loading}
+              onChange={handleInputChange}
+              error={!!formErrors.model}
+              helperText={formErrors.model}
+              margin="normal"
             />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required error={!!errors.year} disabled={loading}>
-              <InputLabel>Année</InputLabel>
-              <Select
-                name="year"
-                value={formData.year}
-                onChange={handleChange}
-                label="Année"
-              >
-                {years.map(year => (
-                  <MenuItem key={year} value={year}>{year}</MenuItem>
-                ))}
-              </Select>
-              {errors.year && <FormHelperText>{errors.year}</FormHelperText>}
-            </FormControl>
           </Grid>
           
           <Grid item xs={12} sm={6}>
             <TextField
-              name="licensePlate"
-              label="Plaque d'immatriculation"
-              fullWidth
-              value={formData.licensePlate}
-              onChange={handleChange}
-              error={!!errors.licensePlate}
-              helperText={errors.licensePlate}
               required
-              disabled={loading}
+              fullWidth
+              label="Plaque d'immatriculation"
+              name="licensePlate"
+              value={formData.licensePlate}
+              onChange={handleInputChange}
+              error={!!formErrors.licensePlate}
+              helperText={formErrors.licensePlate}
+              margin="normal"
+              disabled={isEditing} // Désactiver si en mode édition
             />
           </Grid>
           
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required error={!!errors.color} disabled={loading}>
-              <InputLabel>Couleur</InputLabel>
+            <FormControl 
+              fullWidth 
+              margin="normal"
+              error={!!formErrors.color}
+            >
+              <InputLabel>Couleur *</InputLabel>
               <Select
                 name="color"
                 value={formData.color}
-                onChange={handleChange}
-                label="Couleur"
-                renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    {getColorBox(selected)}
-                    {selected}
-                  </Box>
-                )}
+                onChange={handleInputChange}
+                label="Couleur *"
               >
-                {carColors.map(color => (
-                  <MenuItem key={color} value={color}>
+                {colors.map((color) => (
+                  <MenuItem key={color.name} value={color.name}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {getColorBox(color)}
-                      {color}
+                      <Box 
+                        sx={{ 
+                          width: 20, 
+                          height: 20, 
+                          borderRadius: '50%', 
+                          bgcolor: color.hexCode,
+                          border: '1px solid #ddd',
+                          mr: 1
+                        }} 
+                      />
+                      {color.name}
                     </Box>
                   </MenuItem>
                 ))}
               </Select>
-              {errors.color && <FormHelperText>{errors.color}</FormHelperText>}
+              {formErrors.color && (
+                <FormHelperText>{formErrors.color}</FormHelperText>
+              )}
             </FormControl>
           </Grid>
           
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth required error={!!errors.fuelType} disabled={loading}>
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }}>Détails techniques</Divider>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              label="Année"
+              name="year"
+              type="number"
+              InputProps={{ inputProps: { min: 1900, max: new Date().getFullYear() + 1 } }}
+              value={formData.year}
+              onChange={handleInputChange}
+              error={!!formErrors.year}
+              helperText={formErrors.year}
+              margin="normal"
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              label="Kilométrage"
+              name="mileage"
+              type="number"
+              InputProps={{ inputProps: { min: 0 } }}
+              value={formData.mileage}
+              onChange={handleInputChange}
+              error={!!formErrors.mileage}
+              helperText={formErrors.mileage}
+              margin="normal"
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl 
+              fullWidth 
+              margin="normal"
+              error={!!formErrors.fuelType}
+            >
               <InputLabel>Type de carburant</InputLabel>
               <Select
                 name="fuelType"
                 value={formData.fuelType}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 label="Type de carburant"
               >
-                {fuelTypes.map(fuel => (
-                  <MenuItem key={fuel} value={fuel}>{fuel}</MenuItem>
+                {fuelTypes.map((fuel) => (
+                  <MenuItem key={fuel.id} value={fuel.name}>
+                    {fuel.name}
+                  </MenuItem>
                 ))}
               </Select>
-              {errors.fuelType && <FormHelperText>{errors.fuelType}</FormHelperText>}
+              {formErrors.fuelType && (
+                <FormHelperText>{formErrors.fuelType}</FormHelperText>
+              )}
             </FormControl>
           </Grid>
           
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={6} md={3}>
             <TextField
-              name="mileage"
-              label="Kilométrage"
+              fullWidth
+              label="Score de sécurité (%)"
+              name="safetyScore"
               type="number"
-              fullWidth
-              value={formData.mileage}
-              onChange={handleNumberChange}
-              error={!!errors.mileage}
-              helperText={errors.mileage}
-              required
-              disabled={loading}
-              InputProps={{
-                endAdornment: <Typography variant="body2" sx={{ ml: 1 }}>km</Typography>,
-              }}
+              InputProps={{ inputProps: { min: 0, max: 100 } }}
+              value={formData.safetyScore}
+              onChange={handleInputChange}
+              error={!!formErrors.safetyScore}
+              helperText={formErrors.safetyScore}
+              margin="normal"
             />
           </Grid>
           
           <Grid item xs={12}>
-            <Divider sx={{ my: 1 }} />
-          </Grid>
-          
-          {/* Information propriétaire */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Information propriétaire
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={12}>
-            {userId ? (
-              <TextField
-                label="Propriétaire"
-                fullWidth
-                value={selectedUser?.fullName || 'Utilisateur assigné'}
-                disabled
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-            ) : (
-              <Autocomplete
-                options={users}
-                loading={loadingUsers}
-                value={selectedUser}
-                onChange={handleUserChange}
-                getOptionLabel={(option) => option.fullName || ''}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Propriétaire"
-                    required
-                    error={!!errors.userId}
-                    helperText={errors.userId}
-                    disabled={loading}
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {loadingUsers ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <Box>
-                      <Typography variant="body1">{option.fullName}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.email}
-                      </Typography>
-                    </Box>
-                  </li>
-                )}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-              />
-            )}
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Divider sx={{ my: 1 }} />
-          </Grid>
-          
-          {/* Informations techniques */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Informations techniques
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              name="vin"
-              label="Numéro VIN"
-              fullWidth
-              value={formData.vin}
-              onChange={handleChange}
-              error={!!errors.vin}
-              helperText={errors.vin || 'Numéro d\'identification du véhicule (17 caractères)'}
-              disabled={loading}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              name="deviceId"
-              label="ID de l'appareil"
-              fullWidth
-              value={formData.deviceId}
-              onChange={handleChange}
-              error={!!errors.deviceId}
-              helperText={errors.deviceId || 'Identifiant du boîtier AI-Drive'}
-              disabled={loading}
-            />
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.status === 'ACTIVE'}
-                    onChange={handleSwitchChange}
-                    name="status"
-                    color="primary"
-                    disabled={loading}
-                  />
-                }
-                label="Véhicule actif"
-              />
-            </Box>
+            <FormControl 
+              fullWidth 
+              margin="normal"
+              error={!!formErrors.status}
+            >
+              <InputLabel>Statut</InputLabel>
+              <Select
+                name="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                label="Statut"
+              >
+                {statusOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
         </Grid>
       </DialogContent>
       
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={handleClose} disabled={loading}>
+      <DialogActions>
+        <Button 
+          onClick={handleClose} 
+          color="inherit"
+          disabled={loading}
+        >
           Annuler
         </Button>
         <Button 
-          onClick={handleSubmit}
+          onClick={handleSubmit} 
+          color="primary" 
           variant="contained"
-          color="primary"
           disabled={loading}
-          startIcon={loading && <CircularProgress size={20} />}
+          startIcon={loading && <CircularProgress size={20} color="inherit" />}
         >
-          {loading ? 'Sauvegarde en cours...' : isEditMode ? 'Mettre à jour' : 'Créer'}
+          {isEditing ? 'Mettre à jour' : 'Créer'}
         </Button>
       </DialogActions>
     </Dialog>
