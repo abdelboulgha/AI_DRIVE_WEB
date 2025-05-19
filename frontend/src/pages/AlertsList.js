@@ -78,6 +78,31 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, L
 
 const COLORS = ['#f44336', '#ff9800', '#2196f3', '#4caf50'];
 
+// Données de démonstration pour les statistiques en attendant l'implémentation backend
+const demoStats = {
+  totalAlerts: 0,
+  severityStats: {
+    high: 0,
+    medium: 0,
+    low: 0
+  },
+  statusStats: {
+    new: 0,
+    acknowledged: 0,
+    resolved: 0
+  },
+  typeStats: [],
+  topCars: [],
+  timeStats: {
+    byHour: Array.from({length: 24}, (_, i) => ({ hour: i, count: 0 })),
+    byDay: Array.from({length: 7}, (_, i) => ({ 
+      day: i + 1, 
+      dayName: ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"][i], 
+      count: 0 
+    }))
+  }
+};
+
 const AlertsList = () => {
   const navigate = useNavigate();
   const { userId, carId } = useParams(); // Utilisé si on veut filtrer par utilisateur ou voiture
@@ -102,7 +127,7 @@ const AlertsList = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [orderBy, setOrderBy] = useState('timestamp');
   const [order, setOrder] = useState('desc');
-  const [alertStats, setAlertStats] = useState(null);
+  const [alertStats, setAlertStats] = useState(demoStats);
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
     severity: '',
@@ -135,6 +160,78 @@ const AlertsList = () => {
     { value: 'ACKNOWLEDGED', label: 'Traitée', color: 'warning' },
     { value: 'RESOLVED', label: 'Résolue', color: 'success' }
   ];
+
+  // Fonction pour calculer des statistiques à partir des alertes récupérées
+  const calculateStats = (alertsList) => {
+    if (!alertsList || alertsList.length === 0) {
+      return demoStats;
+    }
+
+    const stats = {
+      totalAlerts: alertsList.length,
+      severityStats: {
+        high: 0,
+        medium: 0,
+        low: 0
+      },
+      statusStats: {
+        new: 0,
+        acknowledged: 0,
+        resolved: 0
+      },
+      typeStats: [],
+      topCars: [],
+      timeStats: {
+        byHour: Array.from({length: 24}, (_, i) => ({ hour: i, count: 0 })),
+        byDay: Array.from({length: 7}, (_, i) => ({ 
+          day: i + 1, 
+          dayName: ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"][i], 
+          count: 0 
+        }))
+      }
+    };
+
+    // Calculer les statistiques de sévérité et statut
+    alertsList.forEach(alert => {
+      // Sévérité
+      if (alert.severity === 'HIGH') stats.severityStats.high++;
+      else if (alert.severity === 'MEDIUM') stats.severityStats.medium++;
+      else if (alert.severity === 'LOW') stats.severityStats.low++;
+
+      // Statut
+      if (alert.status === 'NEW') stats.statusStats.new++;
+      else if (alert.status === 'ACKNOWLEDGED') stats.statusStats.acknowledged++;
+      else if (alert.status === 'RESOLVED') stats.statusStats.resolved++;
+
+      // Statistiques temporelles (à améliorer)
+      try {
+        const date = new Date(alert.timestamp);
+        const hour = date.getHours();
+        const day = date.getDay() === 0 ? 7 : date.getDay(); // 1 = Lundi, ..., 7 = Dimanche
+
+        stats.timeStats.byHour[hour].count++;
+        stats.timeStats.byDay[day - 1].count++;
+      } catch (e) {
+        console.error("Erreur lors du parsing de la date:", e);
+      }
+    });
+
+    // Compter les types d'alertes
+    const typeCounts = {};
+    alertsList.forEach(alert => {
+      if (!typeCounts[alert.type]) {
+        typeCounts[alert.type] = 0;
+      }
+      typeCounts[alert.type]++;
+    });
+
+    stats.typeStats = Object.keys(typeCounts).map(type => ({
+      type,
+      count: typeCounts[type]
+    }));
+
+    return stats;
+  };
   
   const fetchAlerts = async () => {
     try {
@@ -167,8 +264,20 @@ const AlertsList = () => {
         response = await AlertService.getAllAlerts(params);
       }
       
+      // Mettre à jour les alertes et la pagination
       setAlerts(response.data);
       setTotalAlerts(response.meta.total);
+      
+      // Calculer des statistiques basiques en attendant l'endpoint dédié
+      const calculatedStats = calculateStats(response.data);
+      setAlertStats(prev => ({
+        ...prev,
+        totalAlerts: response.meta.total,
+        severityStats: calculatedStats.severityStats,
+        statusStats: calculatedStats.statusStats,
+        typeStats: calculatedStats.typeStats,
+        timeStats: calculatedStats.timeStats
+      }));
       
       setLoading(false);
     } catch (err) {
@@ -185,8 +294,14 @@ const AlertsList = () => {
       if (userId) params.userId = userId;
       if (carId) params.carId = carId;
       
-      const response = await AlertService.getAlertStats(params);
-      setAlertStats(response.data);
+      try {
+        const response = await AlertService.getAlertStats(params);
+        setAlertStats(response.data);
+      } catch (error) {
+        // Si l'endpoint statistiques n'est pas disponible, 
+        // on utilise les statistiques calculées localement
+        console.warn("L'endpoint des statistiques n'est pas disponible. Utilisation des statistiques calculées localement.");
+      }
     } catch (err) {
       console.error('Erreur lors du chargement des statistiques:', err);
     }
@@ -194,6 +309,8 @@ const AlertsList = () => {
   
   useEffect(() => {
     fetchAlerts();
+    // Essayer de récupérer les statistiques du backend, mais ne pas bloquer
+    // si cela échoue
     fetchStats();
   }, [userId, carId, page, rowsPerPage, tabValue, orderBy, order, filters]);
   
@@ -271,8 +388,8 @@ const AlertsList = () => {
   };
   
   const handleViewCar = () => {
-    if (selectedAlert && selectedAlert.carId) {
-      navigate(`/cars/${selectedAlert.carId}`);
+    if (selectedAlert && selectedAlert.vehicle && selectedAlert.vehicle.id) {
+      navigate(`/vehicles/${selectedAlert.vehicle.id}`);
     }
     handleMenuClose();
   };
@@ -576,7 +693,7 @@ const AlertsList = () => {
                 <IconButton
                   edge="end"
                   size="small"
-                  onClick={() => navigate(`/cars/${car.carId}`)}
+                  onClick={() => navigate(`/vehicles/${car.carId}`)}
                 >
                   <VisibilityIcon fontSize="small" />
                 </IconButton>
@@ -882,10 +999,10 @@ const AlertsList = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                              {alert.car.brand} {alert.car.model}
+                              {alert.vehicle ? `${alert.vehicle.brand} ${alert.vehicle.model}` : 'Véhicule ' + (alert.vehicleId || 'inconnu')}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {alert.car.licensePlate}
+                              {alert.vehicle?.licensePlate || ''}
                             </Typography>
                           </Box>
                         </Box>
@@ -957,10 +1074,12 @@ const AlertsList = () => {
           <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
           Voir détails
         </MenuItem>
-        <MenuItem onClick={handleViewCar}>
-          <DirectionsCarIcon fontSize="small" sx={{ mr: 1 }} />
-          Voir le véhicule
-        </MenuItem>
+        {selectedAlert && selectedAlert.vehicleId && (
+          <MenuItem onClick={handleViewCar}>
+            <DirectionsCarIcon fontSize="small" sx={{ mr: 1 }} />
+            Voir le véhicule
+          </MenuItem>
+        )}
         <Divider />
         {selectedAlert && selectedAlert.status === 'NEW' && (
           <MenuItem onClick={() => handleUpdateStatus('ACKNOWLEDGED')}>
