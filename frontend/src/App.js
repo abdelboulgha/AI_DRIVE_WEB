@@ -20,6 +20,7 @@ import AlertDetails from './pages/AlertDetails';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import UserVehicles from './pages/UserVehicles';
 
 // Création du thème
 const theme = createTheme({
@@ -135,7 +136,7 @@ function App() {
     {/* Routes de gestion des utilisateurs */}
     <Route path="users" element={<AdminRoute><UsersList /></AdminRoute>} />
     <Route path="users/:userId" element={<AdminRoute><UserProfile /></AdminRoute>} />
-    <Route path="users/:userId/cars" element={<AdminRoute><CarsList /></AdminRoute>} />
+    <Route path="users/:userId/cars" element={<AdminRoute><UserVehicles /></AdminRoute>} />
     <Route path="profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
     
     {/* Routes de gestion des véhicules */}

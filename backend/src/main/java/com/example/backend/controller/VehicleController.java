@@ -29,7 +29,11 @@ public class VehicleController {
         this.authService = authService;
         this.vehicleRepository = vehicleRepository;  // Initialisation dans le constructeur
     }
-
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Vehicle>> getVehiclesByUserId(@PathVariable Long userId) {
+        List<Vehicle> vehicles = vehicleService.getVehiclesByUserId(userId);
+        return new ResponseEntity<>(vehicles, HttpStatus.OK);
+    }
     // Méthodes existantes
     @GetMapping
     public ResponseEntity<List<Vehicle>> getAllVehicles() {

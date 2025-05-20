@@ -7,6 +7,8 @@ import com.example.backend.entity.User;
 import com.example.backend.entity.Vehicle;
 import com.example.backend.repository.UserRepository;
 import com.example.backend.service.AuthService;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,11 +26,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
+    @Autowired
+    private EntityManager entityManager;
 
     @Autowired
-    public AuthController(AuthService authService, UserRepository userRepository) {
+    public AuthController(AuthService authService, UserRepository userRepository,EntityManager entityManager) {
         this.authService = authService;
         this.userRepository = userRepository;
+        this.entityManager = entityManager;
     }
 
     @PostMapping("/signup")
@@ -71,28 +76,48 @@ public class AuthController {
     //yarbiii
 
     @DeleteMapping("/users/delete-unsecured/{id}")
+    @Transactional  // <-- Ajoutez cette annotation !
     public ResponseEntity<?> deleteUserUnsecured(@PathVariable Long id) {
         try {
             // Vérifier si l'utilisateur existe
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec l'ID: " + id));
 
-            // Supprimer les relations avec les véhicules
-            List<Vehicle> vehicles = new ArrayList<>(user.getVehicles());
-            for (Vehicle vehicle : vehicles) {
-                user.removeVehicle(vehicle);
-            }
+            // Approche avec SQL natif et paramètre positionnel
+            entityManager.createNativeQuery("DELETE FROM alerts WHERE user_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
 
-            // Sauvegarder les changements dans les relations avant de supprimer l'utilisateur
-            userRepository.save(user);
+            // Supprimer les données de l'accéléromètre
+            entityManager.createNativeQuery("DELETE FROM accelerometer_data WHERE user_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
+
+            // Supprimer les données GPS
+            entityManager.createNativeQuery("DELETE FROM gps_data WHERE user_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
+
+            // Supprimer les données du gyroscope
+            entityManager.createNativeQuery("DELETE FROM gyroscope_data WHERE user_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
+
+            // Supprimer les relations avec les véhicules
+            entityManager.createNativeQuery("DELETE FROM user_vehicles WHERE user_id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
 
             // Supprimer l'utilisateur
-            userRepository.delete(user);
+            entityManager.createNativeQuery("DELETE FROM users WHERE id = ?")
+                    .setParameter(1, id)
+                    .executeUpdate();
 
             return new ResponseEntity<>(
                     Map.of("message", "Utilisateur supprimé avec succès (sans sécurité)", "userId", id),
                     HttpStatus.OK);
         } catch (Exception e) {
+            e.printStackTrace();
             return new ResponseEntity<>(
                     Map.of("error", "Erreur lors de la suppression de l'utilisateur: " + e.getMessage()),
                     HttpStatus.INTERNAL_SERVER_ERROR);

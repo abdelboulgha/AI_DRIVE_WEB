@@ -22,6 +22,7 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     Page<Alert> findByStatusAndVehicle(String status, Vehicle vehicle, Pageable pageable);
     Page<Alert> findBySeverity(String severity, Pageable pageable);
     Page<Alert> findByType(String type, Pageable pageable);
+    void deleteAllByUserId(Long userId);
 
     @Query("SELECT COUNT(a) FROM Alert a WHERE a.status = ?1")
     long countByStatus(String status);

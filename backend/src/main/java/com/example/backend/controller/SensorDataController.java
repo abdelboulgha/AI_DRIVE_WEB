@@ -27,7 +27,7 @@ public class SensorDataController {
         this.vehicleRepository=vehicleRepository;
     }
 
-    // Endpoints pour l'accéléromètre
+
     @PostMapping("/accelerometer")
     public ResponseEntity<AccelerometerData> saveAccelerometerData(
             @RequestBody AccelerometerData data,
@@ -54,7 +54,7 @@ public class SensorDataController {
         return new ResponseEntity<>(data, HttpStatus.OK);
     }
 
-    // Endpoints pour le GPS
+
     @PostMapping("/gps")
     public ResponseEntity<GPSData> saveGPSData(
             @RequestBody GPSData data,
@@ -123,7 +123,7 @@ public class SensorDataController {
         return new ResponseEntity<>(data, HttpStatus.OK);
     }
 
-    // Endpoints pour le gyroscope
+
     @PostMapping("/gyroscope")
     public ResponseEntity<GyroscopeData> saveGyroscopeData(
             @RequestBody GyroscopeData data,
