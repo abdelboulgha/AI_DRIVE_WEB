@@ -7,6 +7,7 @@ import com.example.backend.entity.User;
 import com.example.backend.entity.Vehicle;
 import com.example.backend.repository.UserRepository;
 import com.example.backend.service.AuthService;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,8 +55,15 @@ public class AuthController {
     public ResponseEntity<List<User>> getAllUsers() {
         try {
             List<User> users = userRepository.findAll();
+
+            // Initialiser explicitement les collections lazy
+            for (User user : users) {
+                Hibernate.initialize(user.getVehicles());
+            }
+
             return new ResponseEntity<>(users, HttpStatus.OK);
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("Error retrieving users: " + e.getMessage());
         }
     }

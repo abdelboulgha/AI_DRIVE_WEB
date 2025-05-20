@@ -388,8 +388,8 @@ const AlertsList = () => {
   };
   
   const handleViewCar = () => {
-    if (selectedAlert && selectedAlert.vehicle && selectedAlert.vehicle.id) {
-      navigate(`/vehicles/${selectedAlert.vehicle.id}`);
+    if (selectedAlert && selectedAlert.car && selectedAlert.car.id) {
+      navigate(`/vehicles/${selectedAlert.car.id}`);
     }
     handleMenuClose();
   };
@@ -999,10 +999,10 @@ const AlertsList = () => {
                           </Avatar>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                              {alert.vehicle ? `${alert.vehicle.brand} ${alert.vehicle.model}` : 'Véhicule ' + (alert.vehicleId || 'inconnu')}
+                              {alert.car ? `${alert.car.brand} ${alert.car.model}` : 'Véhicule ' + (alert.vehicleId || 'inconnu')}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {alert.vehicle?.licensePlate || ''}
+                              {alert.car?.licensePlate || ''}
                             </Typography>
                           </Box>
                         </Box>
@@ -1074,7 +1074,7 @@ const AlertsList = () => {
           <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
           Voir détails
         </MenuItem>
-        {selectedAlert && selectedAlert.vehicleId && (
+        {selectedAlert && selectedAlert.car && selectedAlert.car.id && (
           <MenuItem onClick={handleViewCar}>
             <DirectionsCarIcon fontSize="small" sx={{ mr: 1 }} />
             Voir le véhicule

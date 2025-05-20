@@ -52,10 +52,51 @@ public class AlertController {
 
         Page<Alert> alertsPage = alertService.getAllAlerts(page, limit, sort);
 
-        List<Alert> alerts = alertsPage.getContent();
+        // Convertir les Alert en AlertResponseDTO
+        List<AlertResponseDTO> alertDTOs = alertsPage.getContent().stream()
+                .map(alert -> {
+                    AlertResponseDTO dto = new AlertResponseDTO();
+                    dto.setId(alert.getId());
+                    dto.setType(alert.getType());
+                    dto.setDescription(alert.getDescription());
+                    dto.setSeverity(alert.getSeverity());
+                    dto.setStatus(alert.getStatus());
+                    dto.setTimestamp(alert.getTimestamp());
+                    dto.setNotes(alert.getNotes());
+                    dto.setData(alert.getData());
+
+                    // Ajout des informations de localisation
+                    if (alert.getLocation() != null) {
+                        AlertResponseDTO.LocationDTO locationDTO = new AlertResponseDTO.LocationDTO();
+                        locationDTO.setLatitude(alert.getLocation().getLatitude());
+                        locationDTO.setLongitude(alert.getLocation().getLongitude());
+                        dto.setLocation(locationDTO);
+                    }
+
+                    // Ajout des informations du véhicule
+                    if (alert.getVehicle() != null) {
+                        AlertResponseDTO.VehicleDTO vehicleDTO = new AlertResponseDTO.VehicleDTO();
+                        vehicleDTO.setId(alert.getVehicle().getId());
+                        vehicleDTO.setBrand(alert.getVehicle().getBrand());
+                        vehicleDTO.setModel(alert.getVehicle().getModel());
+                        vehicleDTO.setLicensePlate(alert.getVehicle().getLicensePlate());
+                        dto.setCar(vehicleDTO);
+                    }
+
+                    // Ajout des informations de l'utilisateur
+                    if (alert.getUser() != null) {
+                        AlertResponseDTO.UserDTO userDTO = new AlertResponseDTO.UserDTO();
+                        userDTO.setId(alert.getUser().getId());
+                        userDTO.setUsername(alert.getUser().getUsername()); // Assurez-vous que cette méthode existe
+                        dto.setUser(userDTO);
+                    }
+
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
         Map<String, Object> response = new HashMap<>();
-        response.put("data", alerts);
+        response.put("data", alertDTOs);
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("page", page);
