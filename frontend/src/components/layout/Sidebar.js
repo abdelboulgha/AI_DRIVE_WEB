@@ -94,10 +94,8 @@ const Sidebar = ({ open, onClose }) => {
         backgroundColor: theme.palette.primary.main,
         color: 'white'
       }}>
-        <DirectionsCarIcon sx={{ fontSize: 40, mb: 1 }} />
-        <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-          AI-Drive
-        </Typography>
+        <DirectionsCarIcon sx={{ fontSize: 20, mb: 1 }} />
+        
       </Box>
       
       <Divider />

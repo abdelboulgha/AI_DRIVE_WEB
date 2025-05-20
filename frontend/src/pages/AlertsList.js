@@ -712,47 +712,10 @@ const AlertsList = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Alertes par heure
-              </Typography>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={alertStats.timeStats.byHour.map(item => ({
-                    ...item,
-                    hour: `${item.hour}h`
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="hour" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Bar dataKey="count" fill="#2196f3" name="Nombre d'alertes" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Alertes par jour
-              </Typography>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={alertStats.timeStats.byDay}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dayName" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Bar dataKey="count" fill="#4caf50" name="Nombre d'alertes" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
           </Card>
         </Grid>
       </Grid>
@@ -1074,93 +1037,7 @@ const AlertsList = () => {
           <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
           Voir détails
         </MenuItem>
-        {selectedAlert && selectedAlert.car && selectedAlert.car.id && (
-          <MenuItem onClick={handleViewCar}>
-            <DirectionsCarIcon fontSize="small" sx={{ mr: 1 }} />
-            Voir le véhicule
-          </MenuItem>
-        )}
-        <Divider />
-        {selectedAlert && selectedAlert.status === 'NEW' && (
-          <MenuItem onClick={() => handleUpdateStatus('ACKNOWLEDGED')}>
-            <CheckIcon fontSize="small" sx={{ mr: 1 }} />
-            Marquer comme traitée
-          </MenuItem>
-        )}
-        {selectedAlert && (selectedAlert.status === 'NEW' || selectedAlert.status === 'ACKNOWLEDGED') && (
-          <MenuItem onClick={() => handleUpdateStatus('RESOLVED')}>
-            <DoneIcon fontSize="small" sx={{ mr: 1 }} />
-            Marquer comme résolue
-          </MenuItem>
-        )}
-        {selectedAlert && selectedAlert.status !== 'NEW' && (
-          <MenuItem onClick={() => handleUpdateStatus('NEW')}>
-            <DoNotDisturbIcon fontSize="small" sx={{ mr: 1 }} />
-            Marquer comme nouvelle
-          </MenuItem>
-        )}
-        <Divider />
-        <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Supprimer
-        </MenuItem>
       </Menu>
-      
-      {/* Dialog de confirmation de suppression */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleDeleteCancel}
-      >
-        <DialogTitle>
-          Confirmer la suppression
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Êtes-vous sûr de vouloir supprimer cette alerte ? Cette action est irréversible.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel}>
-            Annuler
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            Supprimer
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Dialog de mise à jour du statut */}
-      <Dialog
-        open={statusDialogOpen}
-        onClose={handleStatusDialogClose}
-      >
-        <DialogTitle>
-          Mise à jour du statut
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Vous allez changer le statut de l'alerte vers "{getStatusInfo(newStatus).label}".
-            Vous pouvez ajouter une note optionnelle ci-dessous.
-          </DialogContentText>
-          <TextField
-            label="Note (optionnelle)"
-            fullWidth
-            multiline
-            rows={3}
-            value={statusNote}
-            onChange={(e) => setStatusNote(e.target.value)}
-            variant="outlined"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleStatusDialogClose}>
-            Annuler
-          </Button>
-          <Button onClick={handleStatusUpdateConfirm} color="primary" variant="contained">
-            Mettre à jour
-          </Button>
-        </DialogActions>
-      </Dialog>
       
       {/* Menu de filtres */}
       <Menu
