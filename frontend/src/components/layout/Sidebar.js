@@ -48,7 +48,7 @@ const adminMenuItems = [
 // Menu de gestion
 const managementMenuItems = [
   { text: 'Véhicules', icon: <DirectionsCarIcon />, path: '/cars' },
-  { text: 'Alertes', icon: <NotificationsIcon />, badge: 5, path: '/alerts' }
+  { text: 'Alertes', icon: <NotificationsIcon />, path: '/alerts' }
 ];
 
 const Sidebar = ({ open, onClose }) => {

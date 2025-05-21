@@ -35,9 +35,50 @@ public class AlertController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Alert> getAlertById(@PathVariable Long id) {
+    public ResponseEntity<AlertResponseDTO> getAlertById(@PathVariable Long id) {
         Alert alert = alertService.getAlertById(id);
-        return new ResponseEntity<>(alert, HttpStatus.OK);
+
+        // Convertir Alert en AlertResponseDTO
+        AlertResponseDTO responseDTO = new AlertResponseDTO();
+        responseDTO.setId(alert.getId());
+        responseDTO.setType(alert.getType());
+        responseDTO.setDescription(alert.getDescription());
+        responseDTO.setSeverity(alert.getSeverity());
+        responseDTO.setStatus(alert.getStatus());
+        responseDTO.setTimestamp(alert.getTimestamp());
+        responseDTO.setNotes(alert.getNotes());
+        responseDTO.setData(alert.getData());
+
+        // Ajouter l'ID du véhicule directement dans la réponse
+        if (alert.getVehicle() != null) {
+            responseDTO.setVehicleId(alert.getVehicle().getId());
+
+            // Vous pouvez aussi continuer à inclure les informations détaillées du véhicule
+            AlertResponseDTO.VehicleDTO vehicleDTO = new AlertResponseDTO.VehicleDTO();
+            vehicleDTO.setId(alert.getVehicle().getId());
+            vehicleDTO.setBrand(alert.getVehicle().getBrand());
+            vehicleDTO.setModel(alert.getVehicle().getModel());
+            vehicleDTO.setLicensePlate(alert.getVehicle().getLicensePlate());
+            responseDTO.setCar(vehicleDTO);
+        }
+
+        // Ajouter location si disponible
+        if (alert.getLocation() != null) {
+            AlertResponseDTO.LocationDTO locationDTO = new AlertResponseDTO.LocationDTO();
+            locationDTO.setLatitude(alert.getLocation().getLatitude());
+            locationDTO.setLongitude(alert.getLocation().getLongitude());
+            responseDTO.setLocation(locationDTO);
+        }
+
+        // Ajouter user si disponible
+        if (alert.getUser() != null) {
+            AlertResponseDTO.UserDTO userDTO = new AlertResponseDTO.UserDTO();
+            userDTO.setId(alert.getUser().getId());
+            userDTO.setUsername(alert.getUser().getUsername());
+            responseDTO.setUser(userDTO);
+        }
+
+        return new ResponseEntity<>(responseDTO, HttpStatus.OK);
     }
 
     @GetMapping

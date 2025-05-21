@@ -14,7 +14,17 @@ public class AlertResponseDTO {
     private LocationDTO location;
     private String notes;
     private String data;
+    private Long vehicleId;
 
+
+
+    public Long getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(Long vehicleId) {
+        this.vehicleId = vehicleId;
+    }
     // Getters et Setters
     public Long getId() {
         return id;

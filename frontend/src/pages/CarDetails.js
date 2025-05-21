@@ -50,11 +50,32 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
-import CarService from '../api/carService';
-import AlertService from '../api/alertService';
-import CarForm from '../components/cars/CarForm';
+import axios from 'axios';
 
 const COLORS = ['#f44336', '#ff9800', '#2196f3', '#4caf50', '#9c27b0'];
+const API_URL = 'http://localhost:8080/api';
+
+// Service pour les véhicules
+const CarService = {
+  getCarById: (id) => {
+    return axios.get(`${API_URL}/vehicles/${id}`);
+  },
+  
+  deleteCar: (id) => {
+    return axios.delete(`${API_URL}/vehicles/${id}`);
+  },
+  
+  updateCar: (id, data) => {
+    return axios.put(`${API_URL}/vehicles/${id}`, data);
+  }
+};
+
+// Service pour les alertes
+const AlertService = {
+  getAlertsByVehicleId: (vehicleId, params = {}) => {
+    return axios.get(`${API_URL}/alerts/vehicle/${vehicleId}`, { params });
+  }
+};
 
 const CarDetails = () => {
   const navigate = useNavigate();
@@ -74,7 +95,15 @@ const CarDetails = () => {
     try {
       setLoading(true);
       const response = await CarService.getCarById(carId);
-      setCar(response.data);
+      
+      // Adapter le format des données si nécessaire
+      const carData = {
+        ...response.data,
+        // Convertir le statut si nécessaire (ACTIF -> ACTIVE)
+        status: response.data.status === 'ACTIF' ? 'ACTIVE' : response.data.status
+      };
+      
+      setCar(carData);
       setLoading(false);
     } catch (err) {
       setError('Erreur lors du chargement des détails du véhicule');
@@ -85,10 +114,27 @@ const CarDetails = () => {
   
   const fetchAlerts = async () => {
     try {
-      const response = await AlertService.getAlertsByCarId(carId, { limit: 10 });
-      setAlerts(response.data);
+      const response = await AlertService.getAlertsByVehicleId(carId, { limit: 10 });
+      
+      // Extraire les données d'alerte de la réponse
+      // La structure de la réponse est { data: [...], meta: {...} }
+      let alertsData;
+      
+      if (response.data && Array.isArray(response.data.data)) {
+        // La réponse a un format { data: [...], meta: {...} }
+        alertsData = response.data.data;
+      } else if (response.data && Array.isArray(response.data)) {
+        // La réponse est un tableau directement
+        alertsData = response.data;
+      } else {
+        // Fallback - si la structure n'est pas reconnue
+        alertsData = [];
+      }
+      
+      setAlerts(alertsData);
     } catch (err) {
       console.error('Erreur lors du chargement des alertes:', err);
+      setAlerts([]);
     }
   };
   
@@ -148,7 +194,7 @@ const CarDetails = () => {
   
   // Fonction pour obtenir la couleur du statut
   const getStatusColor = (status) => {
-    return status === 'ACTIVE' ? 'success' : 'default';
+    return status === 'ACTIVE' || status === 'ACTIF' ? 'success' : 'default';
   };
   
   // Fonction pour obtenir la boîte de couleur
@@ -424,11 +470,11 @@ const CarDetails = () => {
                       {car.brand} {car.model}
                     </Typography>
                     <Chip 
-                      label={car.status === 'ACTIVE' ? 'Actif' : 'Inactif'}
+                      label={car.status === 'ACTIVE' || car.status === 'ACTIF' ? 'Actif' : 'Inactif'}
                       size="small"
                       color={getStatusColor(car.status)}
                       sx={{ ml: 2 }}
-                      icon={car.status === 'ACTIVE' ? <CheckCircleIcon /> : <CancelIcon />}
+                      icon={car.status === 'ACTIVE' || car.status === 'ACTIF' ? <CheckCircleIcon /> : <CancelIcon />}
                     />
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
@@ -501,193 +547,10 @@ const CarDetails = () => {
                   </Typography>
                 </Grid>
               </Grid>
-              
-              <Divider sx={{ my: 3 }} />
-              
-              <Typography variant="h6" gutterBottom>
-                Propriétaire
-              </Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
-                <Avatar 
-                  sx={{ 
-                    bgcolor: 'primary.main',
-                    mr: 2
-                  }}
-                >
-                  {car.owner.firstName.charAt(0)}{car.owner.lastName.charAt(0)}
-                </Avatar>
-                
-                <Box>
-                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                    {car.owner.firstName} {car.owner.lastName}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    ID Utilisateur: {car.userId}
-                  </Typography>
-                </Box>
-                
-                <Button 
-                  variant="outlined"
-                  size="small"
-                  component={Link}
-                  to={`/users/${car.userId}`}
-                  sx={{ ml: 'auto' }}
-                >
-                  Voir le profil
-                </Button>
-              </Box>
             </Paper>
           </Grid>
           
-          {/* Statistiques et actions */}
-          <Grid item xs={12} md={6}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom sx={{ pb: 2, borderBottom: '1px solid #eee' }}>
-                    Synthèse des alertes
-                  </Typography>
-                  
-                  {alerts.length > 0 ? (
-                    <>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Box>
-                          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                            {alerts.length}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Total des alertes
-                          </Typography>
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <Box sx={{ textAlign: 'center' }}>
-                            <Chip 
-                              label={alerts.filter(a => a.severity === 'HIGH').length}
-                              color="error"
-                              size="small"
-                              sx={{ mb: 0.5 }}
-                            />
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Élevée
-                            </Typography>
-                          </Box>
-                          
-                          <Box sx={{ textAlign: 'center' }}>
-                            <Chip 
-                              label={alerts.filter(a => a.severity === 'MEDIUM').length}
-                              color="warning"
-                              size="small"
-                              sx={{ mb: 0.5 }}
-                            />
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Moyenne
-                            </Typography>
-                          </Box>
-                          
-                          <Box sx={{ textAlign: 'center' }}>
-                            <Chip 
-                              label={alerts.filter(a => a.severity === 'LOW').length}
-                              color="info"
-                              size="small"
-                              sx={{ mb: 0.5 }}
-                            />
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Faible
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-                      
-                      {renderAlertsPieChart()}
-                      
-                      <Box sx={{ textAlign: 'center', mt: 2 }}>
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          startIcon={<NotificationsActiveIcon />}
-                          onClick={() => setTabValue(1)}
-                        >
-                          Voir toutes les alertes
-                        </Button>
-                      </Box>
-                    </>
-                  ) : (
-                    <Box sx={{ textAlign: 'center', py: 3 }}>
-                      <CheckCircleIcon color="success" sx={{ fontSize: 48, mb: 2 }} />
-                      <Typography variant="h6">
-                        Aucune alerte
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Ce véhicule n'a pas d'alertes enregistrées
-                      </Typography>
-                    </Box>
-                  )}
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom sx={{ pb: 2, borderBottom: '1px solid #eee' }}>
-                    Actions
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        startIcon={<TimelineIcon />}
-                        component={Link}
-                        to={`/cars/${car.id}/data`}
-                      >
-                        Voir les données du véhicule
-                      </Button>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        fullWidth
-                        startIcon={<NotificationsActiveIcon />}
-                        component={Link}
-                        to={`/alerts?carId=${car.id}`}
-                      >
-                        Historique des alertes
-                      </Button>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        fullWidth
-                        startIcon={<EditIcon />}
-                        onClick={() => setEditDialogOpen(true)}
-                      >
-                        Modifier le véhicule
-                      </Button>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={6}>
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        fullWidth
-                        startIcon={<DeleteIcon />}
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        Supprimer le véhicule
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Grid>
-            </Grid>
-          </Grid>
+          
         </Grid>
       )}
       
@@ -908,9 +771,9 @@ const CarDetails = () => {
                     primary="Statut"
                     secondary={
                       <Chip 
-                        label={car.status === 'ACTIVE' ? 'Actif' : 'Inactif'}
+                        label={car.status === 'ACTIVE' || car.status === 'ACTIF' ? 'Actif' : 'Inactif'}
                         color={getStatusColor(car.status)}
-                        icon={car.status === 'ACTIVE' ? <CheckCircleIcon /> : <CancelIcon />}
+                        icon={car.status === 'ACTIVE' || car.status === 'ACTIF' ? <CheckCircleIcon /> : <CancelIcon />}
                       />
                     }
                     primaryTypographyProps={{ color: 'text.secondary', variant: 'subtitle2' }}
@@ -946,14 +809,30 @@ const CarDetails = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Dialog pour modifier le véhicule */}
-      <CarForm
+      {/* Dialog pour modifier le véhicule - simple placeholder */}
+      <Dialog
         open={editDialogOpen}
-        handleClose={() => setEditDialogOpen(false)}
-        car={car}
-        userId={car.userId}
-        onSave={handleCarSaved}
-      />
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Modifier le véhicule
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Formulaire de modification du véhicule à implémenter.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>
+            Annuler
+          </Button>
+          <Button onClick={handleCarSaved} color="primary" variant="contained">
+            Enregistrer
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Snackbar pour les notifications */}
       <Snackbar

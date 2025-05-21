@@ -669,7 +669,7 @@ const CarData = () => {
             </Grid>
             
             {/* Carte GPS */}
-            <Grid item xs={12}>
+            <Grid item xs={12} style={{ width: '300%' }}>
               <Paper sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>
                   Données GPS et trajet

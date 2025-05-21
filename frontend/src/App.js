@@ -16,7 +16,7 @@ import CarsList from './pages/CarsList';
 import CarDetails from './pages/CarDetails';
 import CarData from './pages/CarData';
 import AlertsList from './pages/AlertsList';
-import AlertDetails from './pages/AlertDetails';
+import AlertDetailsV2 from './pages/AlertDetailsV2';
 import Layout from './components/layout/Layout';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AdminRoute from './components/auth/AdminRoute';
@@ -146,7 +146,7 @@ function App() {
     
     {/* Routes de gestion des alertes */}
     <Route path="alerts" element={<PrivateRoute><AlertsList /></PrivateRoute>} />
-    <Route path="alerts/:alertId" element={<PrivateRoute><AlertDetails /></PrivateRoute>} />
+    <Route path="alerts/:alertId" element={<PrivateRoute><AlertDetailsV2/></PrivateRoute>} />
   </Route>
   
   {/* Redirection par défaut */}
